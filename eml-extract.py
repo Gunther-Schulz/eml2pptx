@@ -19,6 +19,9 @@ import json
 
 # conda install conda-forge::weasyprint 
 
+# check version of pptx library
+# pip show python-pptx
+
 presentation_filename = 'presentation.pptx'
 
 text_types = ['text/plain', 'text/html']
@@ -35,7 +38,9 @@ if not os.path.exists(output_dir):
 
 # Check if the PowerPoint file already exists
 if os.path.exists(presentation_filename):
+    # If it does, open it
     prs = Presentation(presentation_filename)
+
 else:
     prs = Presentation()
 
@@ -52,40 +57,113 @@ def hash_image_name(image_name):
     hasher.update(name.encode('utf-8'))
     unique_representation = hasher.hexdigest()
     # return "hash_image_" + unique_representation
-    return "hash_image_" + image_name
-
-
+    return image_name
 
 def hash_sender_name(sender):  
     hasher = hashlib.md5()
     hasher.update(sender.encode('utf-8'))
     unique_representation = hasher.hexdigest()
     # return "hash_sender_" + unique_representation
-    return "hash_sender_" + sender
+    return sender
 
-def write_default_json_to_notes(slide):
-    default_for_json = {"hashed_image_name": "default", "hashed_sender_name": "default"}
+# def write_default_json_to_notes(slide):
+#     # prs = Presentation()
+#     # title_slide_layout = prs.slide_layouts[0]
+#     # blank_slide_layout = prs.slide_layouts[6]
+
+#     # title_slide = prs.slides.add_slide(title_slide_layout)
+#     # title = title_slide.shapes.title
+#     # title.text = "Title"
+
+#     # notes_slide = title_slide.notes_slide #The only new line of code
+
+#     # blank_slide = prs.slides.add_slide(blank_slide_layout)
+#     # notes_slide = blank_slide.notes_slide
+#     # notes_slide.notes_text_frame.text = "foo"
+
+#     notes_slide = slide.notes_slide
+
+#     text_frame = notes_slide.notes_text_frame
+
+#     notes_placeholder = notes_slide.notes_placeholder
+
+ 
+#     text_frame.text = 'foobar'
+
+#     default_for_json = {"hash_image_name": "default", "hashed_sender_name": "default"}
+#     json_hashed_image_name = json.dumps(default_for_json)
+#     slide.notes_slide.notes_text_frame.text = json_hashed_image_name
+
+def write_default_json_config_to_text_frame(slide):
+    # create a new text box, not a note
+    text_frame = slide.shapes.add_textbox(Cm(0.1), Cm(0), Cm(0.1), Cm(0.1)).text_frame # Parameters are left, top, width, height
+    # write default json to it
+    default_for_json = {"hash_image_name": "default", "hashed_sender_name": "default"}
     json_hashed_image_name = json.dumps(default_for_json)
-    slide.notes_slide.notes_text_frame.text = json_hashed_image_name
+    text_frame.text = json_hashed_image_name
+    text_frame.paragraphs[0].font.size = Pt(1)
+    text_frame.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)
+ 
 
-def write_to_slide_note(slide, key, value):
-    # Read the existing content
-    existing_content = slide.notes_slide.notes_text_frame.text
-    existing_json = json.loads(existing_content) if existing_content else {}
-
-    # Update the JSON
+def write_config_to_text_frame(slide, key, value):
+    json_text_box = None
+    # search all text boxes and find the first one that contains json
+    for shape in slide.shapes:
+        if shape.has_text_frame:
+            text_frame = shape.text_frame
+            if text_frame.text.startswith("{"):
+                json_text_box = text_frame
+                break
+    # get the json from the text box and update it
+    existing_json = json.loads(json_text_box.text)
     existing_json[key] = value
+    # write the updated json back to the text box
+    json_text_box.text = json.dumps(existing_json)
+    text_frame.paragraphs[0].font.size = Pt(1)
+    text_frame.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)
 
-    # Write it back
-    slide.notes_slide.notes_text_frame.text = json.dumps(existing_json)
-
-def read_from_slide_note(slide, key):
-    # Read the existing content
-    existing_content = slide.notes_slide.notes_text_frame.text
-    existing_json = json.loads(existing_content) if existing_content else {}
-
-    # Update the JSON
+def read_config_from_text_frame(slide, key):
+    json_text_box = None
+    # search all text boxes and find the first one that contains json
+    for shape in slide.shapes:
+        if shape.has_text_frame:
+            text_frame = shape.text_frame
+            if text_frame.text.startswith("{"):
+                json_text_box = text_frame
+                break
+    # get the json from the text box and update it
+    existing_json = json.loads(json_text_box.text)
     return existing_json[key]
+
+# def write_to_slide_note(slide, key, value):
+#     # Read the existing content
+
+#     # temp_prs = Presentation()
+#     # blank_slide_layout = temp_prs.slide_layouts[6]
+#     # notes_slide = slide.notes_slide #The only new line of code
+
+#     # blank_slide = temp_prs.slides.add_slide(blank_slide_layout)
+#     # notes_slide = blank_slide.notes_slide
+#     # notes_slide.notes_text_frame.text = "foo"
+
+#     existing_content = slide.notes_slide.notes_text_frame.text
+#     # existing_content = None
+#     existing_json = json.loads(existing_content) if existing_content else {}
+
+#     # Update the JSON
+#     existing_json[key] = value
+
+#     # Write it back
+#     slide.notes_slide.notes_text_frame.text = json.dumps(existing_json)
+
+# def read_from_slide_note(slide, key):
+#     # print(slide.has_notes_slide)
+#     # Read the existing content
+#     existing_content = slide.notes_slide.notes_text_frame.text
+#     existing_json = json.loads(existing_content) if existing_content else {}
+
+#     # Update the JSON
+#     return existing_json[key]
 
 def sanitize_filename(filename):
     return re.sub(r'[\\/*?:"<>|]', '_', filename)
@@ -323,8 +401,9 @@ def process_single_eml_file(filename, output_dir, page_count):
 
     return page_count
 
-def is_duplicate_image(hashed_image_name):
-    return any(read_from_slide_note(slide, "hashed_image_name") == hashed_image_name for slide in prs.slides)
+def is_duplicate_image(hash_image_name):
+    # return any(read_from_slide_note(slide, "hashed_image_name") == hashed_image_name for slide in prs.slides)
+    return any(read_config_from_text_frame(slide, "hash_image_name") == hash_image_name for slide in prs.slides)
 
 def add_image_to_presentation(image, hashed_image_name, hashed_sender_name, page_count):
     # Check if the sender already exists in the dictionary
@@ -337,15 +416,22 @@ def add_image_to_presentation(image, hashed_image_name, hashed_sender_name, page
 
 
 def create_presentation_from_dict(prs):
+    i = 0
     for sender, images in slides_dict.items():
         for image in images:
+            i += 1
             hashed_image_name = hash_image_name(image)
+            # if not is_duplicate_image(hashed_image_name):
             # Add a new slide at the end
+            print(f'Adding slide nr. {i} {image} to slide with hashes {hashed_image_name}')
             slide = prs.slides.add_slide(prs.slide_layouts[5])
+            # write_default_json_to_notes(slide)
+            # write_to_slide_note(slide, "hashed_image_name", hashed_image_name)
+            # write_to_slide_note(slide, "hashed_sender_name", sender)
+            write_default_json_config_to_text_frame(slide)
+            write_config_to_text_frame(slide, "hash_image_name", hashed_image_name)
+            write_config_to_text_frame(slide, "hash_sender_name", sender)
             remove_title_placeholder(slide)
-            # print(f'Adding {image} to slide with hashes {hashed_image_name}')
-            write_to_slide_note(slide, "hashed_image_name", hashed_image_name)
-            write_to_slide_note(slide, "hashed_sender_name", sender)
             add_header_left(slide)
             add_image(slide, image)
             add_text(slide, f'{image_basename(image)}')
@@ -357,11 +443,13 @@ def add_headers_and_print_hashes(prs, page_count):
     for i, slide in enumerate(prs.slides):
         add_header_right(slide, i+1, page_count)
 
-    for i, slide in enumerate(prs.slides):
-        hashed_image_name = read_from_slide_note(slide,"hashed_image_name")
-        hashed_sender_name = read_from_slide_note(slide,"hashed_sender_name")
-        print(f'{i+1}: {hashed_image_name} - {hashed_sender_name}')
-        # print(f'{i+1}: {hashed_image_name}')
+    # for i, slide in enumerate(prs.slides):
+    #     # hashed_image_name = read_from_slide_note(slide,"hashed_image_name")
+    #     # hashed_sender_name = read_from_slide_note(slide,"hashed_sender_name")
+    #     hashed_image_name = read_config_from_text_frame(slide, "hash_image_name")
+    #     hashed_sender_name = read_config_from_text_frame(slide, "hash_sender_name")
+    #     print(f'{i+1}: {hashed_image_name} - {hashed_sender_name}')
+
 
 def save_presentation(prs):
     prs.save(presentation_filename)
@@ -371,3 +459,4 @@ page_count = process_eml_files(input_dir, output_dir)
 create_presentation_from_dict(prs)
 add_headers_and_print_hashes(prs, page_count)
 save_presentation(prs)
+
