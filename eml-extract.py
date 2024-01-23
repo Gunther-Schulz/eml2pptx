@@ -458,5 +458,23 @@ def save_presentation(prs):
 page_count = process_eml_files(input_dir, output_dir)
 create_presentation_from_dict(prs)
 add_headers_and_print_hashes(prs, page_count)
-save_presentation(prs)
+# save_presentation(prs)
 
+# go through all slides and add the hashed sender name to a list
+senders = []
+for i, slide in enumerate(prs.slides):
+    hashed_image_name = read_config_from_text_frame(slide, "hash_image_name")
+    hashed_sender_name = read_config_from_text_frame(slide, "hash_sender_name")
+    senders.append(hashed_sender_name)
+# update list so that if adjecent elments are the same, they are replaced by a single element
+senders = [x for i, x in enumerate(senders) if i == 0 or x != senders[i-1]]
+# show which elements appear more than once in th elist
+duplicates = [item for item in senders if senders.count(item) > 1]
+# remove duplicates from list
+senders = list(dict.fromkeys(duplicates))
+if senders:
+    print(" ")
+    print("The following senders appear in more than one section in the presentation (most likely they got added toward the end):")
+    print(', '.join(map(str, senders)))
+
+save_presentation(prs)
