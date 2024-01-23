@@ -2,21 +2,24 @@ import os
 import email
 from email import policy
 from email.parser import BytesParser
+from email.utils import parsedate_to_datetime
 from weasyprint import HTML
 from pdf2image import convert_from_path
-from PIL import ImageDraw, ImageFont, Image
+from PIL import Image
 from pptx import Presentation
-from pptx.util import Inches, Pt
+from pptx.util import Pt
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Mm, Cm
-# from pptx.enum.shapes import MSO_SHAPE
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_CONNECTOR
 from pptx.enum.shapes import PP_PLACEHOLDER
 import re
 import hashlib
 import json
-import uuid
+
+# conda install conda-forge::weasyprint 
+
+presentation_filename = 'presentation.pptx'
 
 text_types = ['text/plain', 'text/html']
 input_dir = './eml'
@@ -31,8 +34,8 @@ if not os.path.exists(output_dir):
 
 
 # Check if the PowerPoint file already exists
-if os.path.exists('presentation.pptx'):
-    prs = Presentation('presentation.pptx')
+if os.path.exists(presentation_filename):
+    prs = Presentation(presentation_filename)
 else:
     prs = Presentation()
 
@@ -87,12 +90,10 @@ def read_from_slide_note(slide, key):
 def sanitize_filename(filename):
     return re.sub(r'[\\/*?:"<>|]', '_', filename)
 
-# conda install conda-forge::weasyprint 
 
 def get_html_content(msg):
     if msg.is_multipart():
         for part in msg.iter_parts():
-            # Print content_type
             if part.get_content_type() in text_types:
                 return part.get_content()
             elif part.is_multipart():
@@ -240,6 +241,11 @@ def create_directories(output_dir, sender):
 
     return sender_dir, attachments_dir, text_dir, attachments_img_dir, text_img_dir
     
+def get_email_date(msg):
+    email_date = parsedate_to_datetime(msg['Date'])
+    # Format the date and time as YYYYMMDD_HHMMSS
+    formatted_date_time = email_date.strftime('%Y-%m-%d_%H_%M_%S')
+    return formatted_date_time
 
 def save_attachments(msg, output_dir):
     filepaths = []
@@ -249,10 +255,11 @@ def save_attachments(msg, output_dir):
                 payload = part.get_payload(decode=True)
                 if payload is not None:
                     attachment_filename = part.get_filename()
-                    # Add a UUID to the filename
+                    formatted_date =  get_email_date(msg)
                     filename, file_extension = os.path.splitext(attachment_filename)
-                    unique_filename = f"{filename}_{uuid.uuid4()}{file_extension}"
-                    filepath = os.path.join(output_dir, unique_filename)
+                    # Include the date in the filename
+                    filename_with_date = f"{filename}_{formatted_date}{file_extension}"
+                    filepath = os.path.join(output_dir, filename_with_date)
                     with open(filepath, 'wb') as f:
                         f.write(payload)
                     filepaths.append(filepath)
@@ -300,7 +307,6 @@ def process_single_eml_file(filename, output_dir, page_count):
     text_images = convert_pdfs_to_images([text_filepath], text_img_dir)
     
     attachment_filepaths = save_attachments(msg, attachments_dir)
-    print(attachment_filepaths)
                     
     attachment_images = convert_pdfs_to_images(attachment_filepaths, attachments_img_dir)
 
@@ -308,7 +314,6 @@ def process_single_eml_file(filename, output_dir, page_count):
 
     for image in all_images:
         page_count += 1
-        print(f'Page count {page_count}')
         
         hashed_image_name = hash_image_name(image)
         hashed_sender_name = hash_sender_name(sender)
@@ -316,65 +321,37 @@ def process_single_eml_file(filename, output_dir, page_count):
         if not is_duplicate_image(hashed_image_name):
             add_image_to_presentation(image, hashed_image_name, hashed_sender_name, page_count)
 
-    print("------------------------------------------")
     return page_count
 
 def is_duplicate_image(hashed_image_name):
     return any(read_from_slide_note(slide, "hashed_image_name") == hashed_image_name for slide in prs.slides)
 
 def add_image_to_presentation(image, hashed_image_name, hashed_sender_name, page_count):
-    temp_prs = Presentation()
-    # Create a new slide
-    temp_slide = temp_prs.slides.add_slide(prs.slide_layouts[5])  # Assuming layout 5 is blank
-
-    remove_title_placeholder(temp_slide)
-    add_header_left(temp_slide)
-    add_image(temp_slide, image)
-    add_text(temp_slide, f'{image_basename(image)}')
-    add_text_box(temp_slide)
-    add_divider_line(temp_slide, temp_prs)
-    write_to_slide_note(temp_slide, "hashed_image_name", hashed_image_name)
-    write_to_slide_note(temp_slide, "hashed_sender_name", hashed_sender_name)
-
     # Check if the sender already exists in the dictionary
     if hashed_sender_name in slides_dict:
-        # Add the slide to the sender's list
-        slides_dict[hashed_sender_name].append(temp_slide)
+        # Add the image to the sender's list
+        slides_dict[hashed_sender_name].append(image)
     else:
         # If the sender does not exist, create a new list for them
-        slides_dict[hashed_sender_name] = [temp_slide]
+        slides_dict[hashed_sender_name] = [image]
 
-
-    # Check if the sender already exists in the presentation
-    # sender_exists = any(read_from_slide_note(slide, "hashed_sender_name") == hashed_sender_name for slide in prs.slides)
-
-    # if sender_exists:
-    #     # Find the index of the last slide of this sender
-    #     last_slide_index = max(i for i, slide in enumerate(prs.slides) if read_from_slide_note(slide, "hashed_sender_name") == hashed_sender_name)
-
-    #     # Insert a new slide after the last slide of this sender
-    #     slide = prs.slides.add_slide(prs.slide_layouts[5], last_slide_index + 1)
-    # else:
-    #     # If the sender does not exist, add a new slide at the end
-    #     slide = prs.slides.add_slide(prs.slide_layouts[5])
-
-    # remove_title_placeholder(slide)
-    # print(f'Adding {image} to slide {page_count} with hashes {hashed_image_name}')
-    # write_to_slide_note(slide, "hashed_image_name", hashed_image_name)
-    # write_to_slide_note(slide, "hashed_sender_name", hashed_sender_name)
-    # add_header_left(slide)
-    # add_image(slide, image)
-    # add_text(slide, f'{image_basename(image)}')
-    # add_text_box(slide)
-    # add_divider_line(slide, prs)
 
 def create_presentation_from_dict(prs):
-    # Loop through the slides in the dictionary
-    for sender, slides in slides_dict.items():
-        # Loop through the slides in the list
-        for slide in slides:
-            # Add the slide to the presentation
-            prs.slides.add_slide(slide)
+    for sender, images in slides_dict.items():
+        for image in images:
+            hashed_image_name = hash_image_name(image)
+            # Add a new slide at the end
+            slide = prs.slides.add_slide(prs.slide_layouts[5])
+            remove_title_placeholder(slide)
+            # print(f'Adding {image} to slide with hashes {hashed_image_name}')
+            write_to_slide_note(slide, "hashed_image_name", hashed_image_name)
+            write_to_slide_note(slide, "hashed_sender_name", sender)
+            add_header_left(slide)
+            add_image(slide, image)
+            add_text(slide, f'{image_basename(image)}')
+            add_text_box(slide)
+            add_divider_line(slide, prs)
+
 
 def add_headers_and_print_hashes(prs, page_count):
     for i, slide in enumerate(prs.slides):
@@ -387,11 +364,10 @@ def add_headers_and_print_hashes(prs, page_count):
         # print(f'{i+1}: {hashed_image_name}')
 
 def save_presentation(prs):
-    prs.save('presentation.pptx')
+    prs.save(presentation_filename)
 
 # Usage
 page_count = process_eml_files(input_dir, output_dir)
-add_headers_and_print_hashes(prs, page_count)
-print(slides_dict)
 create_presentation_from_dict(prs)
+add_headers_and_print_hashes(prs, page_count)
 save_presentation(prs)
