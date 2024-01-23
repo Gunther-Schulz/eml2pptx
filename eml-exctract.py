@@ -16,12 +16,14 @@ from pptx.enum.shapes import PP_PLACEHOLDER
 import re
 import hashlib
 import json
+import uuid
 
 text_types = ['text/plain', 'text/html']
 input_dir = './eml'
 output_dir = './output'
 font_path = "/Library/Fonts/Arial.ttf"
 page_count = 0
+slides_dict = {}
 
 # Create output directory if it doesn't exist
 if not os.path.exists(output_dir):
@@ -46,7 +48,8 @@ def hash_image_name(image_name):
     hasher = hashlib.md5()
     hasher.update(name.encode('utf-8'))
     unique_representation = hasher.hexdigest()
-    return "hash_image_" + unique_representation
+    # return "hash_image_" + unique_representation
+    return "hash_image_" + image_name
 
 
 
@@ -54,7 +57,8 @@ def hash_sender_name(sender):
     hasher = hashlib.md5()
     hasher.update(sender.encode('utf-8'))
     unique_representation = hasher.hexdigest()
-    return "hash_sender_" + unique_representation
+    # return "hash_sender_" + unique_representation
+    return "hash_sender_" + sender
 
 def write_default_json_to_notes(slide):
     default_for_json = {"hashed_image_name": "default", "hashed_sender_name": "default"}
@@ -245,7 +249,10 @@ def save_attachments(msg, output_dir):
                 payload = part.get_payload(decode=True)
                 if payload is not None:
                     attachment_filename = part.get_filename()
-                    filepath = f'{output_dir}/{attachment_filename}'
+                    # Add a UUID to the filename
+                    filename, file_extension = os.path.splitext(attachment_filename)
+                    unique_filename = f"{filename}_{uuid.uuid4()}{file_extension}"
+                    filepath = os.path.join(output_dir, unique_filename)
                     with open(filepath, 'wb') as f:
                         f.write(payload)
                     filepaths.append(filepath)
@@ -316,28 +323,58 @@ def is_duplicate_image(hashed_image_name):
     return any(read_from_slide_note(slide, "hashed_image_name") == hashed_image_name for slide in prs.slides)
 
 def add_image_to_presentation(image, hashed_image_name, hashed_sender_name, page_count):
-    # Check if the sender already exists in the presentation
-    sender_exists = any(read_from_slide_note(slide, "hashed_sender_name") == hashed_sender_name for slide in prs.slides)
+    temp_prs = Presentation()
+    # Create a new slide
+    temp_slide = temp_prs.slides.add_slide(prs.slide_layouts[5])  # Assuming layout 5 is blank
 
-    if sender_exists:
-        # Find the index of the last slide of this sender
-        last_slide_index = max(i for i, slide in enumerate(prs.slides) if read_from_slide_note(slide, "hashed_sender_name") == hashed_sender_name)
+    remove_title_placeholder(temp_slide)
+    add_header_left(temp_slide)
+    add_image(temp_slide, image)
+    add_text(temp_slide, f'{image_basename(image)}')
+    add_text_box(temp_slide)
+    add_divider_line(temp_slide, temp_prs)
+    write_to_slide_note(temp_slide, "hashed_image_name", hashed_image_name)
+    write_to_slide_note(temp_slide, "hashed_sender_name", hashed_sender_name)
 
-        # Insert a new slide after the last slide of this sender
-        slide = prs.slides.add_slide(prs.slide_layouts[5], last_slide_index + 1)
+    # Check if the sender already exists in the dictionary
+    if hashed_sender_name in slides_dict:
+        # Add the slide to the sender's list
+        slides_dict[hashed_sender_name].append(temp_slide)
     else:
-        # If the sender does not exist, add a new slide at the end
-        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        # If the sender does not exist, create a new list for them
+        slides_dict[hashed_sender_name] = [temp_slide]
 
-    remove_title_placeholder(slide)
-    print(f'Adding {image} to slide {page_count} with hashes {hashed_image_name}')
-    write_to_slide_note(slide, "hashed_image_name", hashed_image_name)
-    write_to_slide_note(slide, "hashed_sender_name", hashed_sender_name)
-    add_header_left(slide)
-    add_image(slide, image)
-    add_text(slide, f'{image_basename(image)}')
-    add_text_box(slide)
-    add_divider_line(slide, prs)
+
+    # Check if the sender already exists in the presentation
+    # sender_exists = any(read_from_slide_note(slide, "hashed_sender_name") == hashed_sender_name for slide in prs.slides)
+
+    # if sender_exists:
+    #     # Find the index of the last slide of this sender
+    #     last_slide_index = max(i for i, slide in enumerate(prs.slides) if read_from_slide_note(slide, "hashed_sender_name") == hashed_sender_name)
+
+    #     # Insert a new slide after the last slide of this sender
+    #     slide = prs.slides.add_slide(prs.slide_layouts[5], last_slide_index + 1)
+    # else:
+    #     # If the sender does not exist, add a new slide at the end
+    #     slide = prs.slides.add_slide(prs.slide_layouts[5])
+
+    # remove_title_placeholder(slide)
+    # print(f'Adding {image} to slide {page_count} with hashes {hashed_image_name}')
+    # write_to_slide_note(slide, "hashed_image_name", hashed_image_name)
+    # write_to_slide_note(slide, "hashed_sender_name", hashed_sender_name)
+    # add_header_left(slide)
+    # add_image(slide, image)
+    # add_text(slide, f'{image_basename(image)}')
+    # add_text_box(slide)
+    # add_divider_line(slide, prs)
+
+def create_presentation_from_dict(prs):
+    # Loop through the slides in the dictionary
+    for sender, slides in slides_dict.items():
+        # Loop through the slides in the list
+        for slide in slides:
+            # Add the slide to the presentation
+            prs.slides.add_slide(slide)
 
 def add_headers_and_print_hashes(prs, page_count):
     for i, slide in enumerate(prs.slides):
@@ -355,4 +392,6 @@ def save_presentation(prs):
 # Usage
 page_count = process_eml_files(input_dir, output_dir)
 add_headers_and_print_hashes(prs, page_count)
+print(slides_dict)
+create_presentation_from_dict(prs)
 save_presentation(prs)
