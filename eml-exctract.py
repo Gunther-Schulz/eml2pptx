@@ -316,22 +316,27 @@ def is_duplicate_image(hashed_image_name):
     return any(read_from_slide_note(slide, "hashed_image_name") == hashed_image_name for slide in prs.slides)
 
 def add_image_to_presentation(image, hashed_image_name, hashed_sender_name, page_count):
-    slide = prs.slides.add_slide(prs.slide_layouts[5])  # Use the blank slide layout
+    # Check if the sender already exists in the presentation
+    sender_exists = any(read_from_slide_note(slide, "hashed_sender_name") == hashed_sender_name for slide in prs.slides)
+
+    if sender_exists:
+        # Find the index of the last slide of this sender
+        last_slide_index = max(i for i, slide in enumerate(prs.slides) if read_from_slide_note(slide, "hashed_sender_name") == hashed_sender_name)
+
+        # Insert a new slide after the last slide of this sender
+        slide = prs.slides.add_slide(prs.slide_layouts[5], last_slide_index + 1)
+    else:
+        # If the sender does not exist, add a new slide at the end
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
 
     remove_title_placeholder(slide)
-    # print(f'Adding {image} to slide {page_count} with hashes {hashed_image_name} and {hash_sender_name(sender)}')
     print(f'Adding {image} to slide {page_count} with hashes {hashed_image_name}')
     write_to_slide_note(slide, "hashed_image_name", hashed_image_name)
-    # add_hashed_sender_name_to_slide(slide, hashed_sender_name)
-
+    write_to_slide_note(slide, "hashed_sender_name", hashed_sender_name)
     add_header_left(slide)
-
     add_image(slide, image)
-    # add_text(slide, f'{sender} - {image_basename(image)}')
     add_text(slide, f'{image_basename(image)}')
-    
     add_text_box(slide)
-
     add_divider_line(slide, prs)
 
 def add_headers_and_print_hashes(prs, page_count):
@@ -340,9 +345,9 @@ def add_headers_and_print_hashes(prs, page_count):
 
     for i, slide in enumerate(prs.slides):
         hashed_image_name = read_from_slide_note(slide,"hashed_image_name")
-        # hashed_sender_name = read_hashed_sender_name_from_slide(slide)
-        # print(f'{i+1}: {hashed_image_name} - {hashed_sender_name}')
-        print(f'{i+1}: {hashed_image_name}')
+        hashed_sender_name = read_from_slide_note(slide,"hashed_sender_name")
+        print(f'{i+1}: {hashed_image_name} - {hashed_sender_name}')
+        # print(f'{i+1}: {hashed_image_name}')
 
 def save_presentation(prs):
     prs.save('presentation.pptx')
