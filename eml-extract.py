@@ -15,40 +15,49 @@ from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_CONNECTOR
 from pptx.enum.shapes import PP_PLACEHOLDER
 import re
-import hashlib
+# import hashlib
 import json
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
 # import email-reply-parser
 from email_reply_parser import EmailReplyParser
 from html import escape
 from PIL import Image
 from PIL import ImageChops
-
-# TODO: implenet adding slides from scanned files (no email)
+import yaml
 
 # conda install conda-forge::weasyprint 
 
 # check version of pptx library
 # pip show python-pptx
 
-presentation_filename = 'presentation.pptx'
-header_title = 'Abwägungsvorschlag Träger öffentlicher Belange, B-Plan XX “XXXX“'
+# if config.yaml does not exist, create it
+if not os.path.exists('config.yaml'):
+    print("config.yaml does not exist. Creating it with default values.")
+    with open('config.yaml', 'w') as f:
+        f.write('presentation_filename: presentation.pptx\n')
+        f.write('header_title: "Eingegangene Emails"\n')
+        f.write('pdf_blacklist:\n')
+        f.write('  - ".*DUMMY.*"\n')
+        f.write('eml_input_dir: eml\n')
+        f.write('scanned_input_dir: scanned\n')
+        f.write('output_dir: output\n')
+        # f.write('font_path: "C:\\Windows\\Fonts\\Arial.ttf"\n')
+        f.write('font_path: "/Library/Fonts/Arial.ttf"\n')
+        f.close()
+    print("Please configure config.yaml and run the script again.")
 
-# create a regex for "Anschreiben-21", "Anschreiben-8", "Anschreiben-688" etc.
-regex_blacklist_1 = re.compile(r"Anschreiben-\d+")
-# create a regex for "23 09.14. Praesentation Baebelitz"
-regex_blacklist_2 = re.compile(r"[0-9.]*.*Praesentation Baebelitz")
-# create a regex for "23 09.08. Baebelitz-Layout1"
-regex_blacklist_3 = re.compile(r"[0-9.]*.*Baebelitz-Layout\d+")
-# create a regex for "Uebertragung"
-regex_blacklist_4 = re.compile(r"Uebertragung")
-pdf_blacklist = [regex_blacklist_1, regex_blacklist_2, regex_blacklist_3, regex_blacklist_4]    
+with open('config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+presentation_filename = config['presentation_filename']
+header_title = config['header_title']
+pdf_blacklist = [re.compile(pattern) for pattern in config['pdf_blacklist']]
+eml_input_dir = config['eml_input_dir']
+scanned_input_dir = config['scanned_input_dir']
+output_dir = config['output_dir']
+font_path = config['font_path']
 
 text_types = ['text/plain', 'text/html']
-eml_input_dir = './eml'
-scanned_input_dir = './scanned'
-output_dir = './output'
-font_path = "/Library/Fonts/Arial.ttf"
 page_count = 0
 slides_dict = {}
 regex_right_header = re.compile(r"Seite \d+/\d+") # regex to match the right header
@@ -621,8 +630,10 @@ def group_consecutive_numbers(numbers):
 
 
 # Usage
-process_eml_files(eml_input_dir, output_dir)
-process_directory_files(scanned_input_dir, output_dir)
+if eml_input_dir:
+    process_eml_files(eml_input_dir, output_dir)
+if scanned_input_dir:
+    process_directory_files(scanned_input_dir, output_dir)
 create_presentation_from_dict(prs)
 add_headers_and_print_hashes(prs)
 save_presentation(prs)
@@ -640,8 +651,11 @@ duplicates = [item for item in senders if senders.count(item) > 1]
 # remove duplicates from list
 senders = list(dict.fromkeys(duplicates))
 
-print("The following senders appear in more than one section in the presentation:")
+sender_str_list = []
 for sender in senders:
     positions = [i+1 for i, x in enumerate(all_senders) if x == sender]
     grouped_positions = group_consecutive_numbers(positions)
-    print(f'{sender} appears at pages {", ".join(grouped_positions)}')
+    sender_str_list.append(f'{sender} appears at pages {", ".join(grouped_positions)}')
+if sender_str_list:
+    print("The following senders appear in more than one section in the presentation:")
+    print("\n".join(sender_str_list))
