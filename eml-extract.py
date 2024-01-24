@@ -518,7 +518,7 @@ process_eml_files(eml_input_dir, output_dir)
 process_directory_files(scanned_input_dir, output_dir)
 create_presentation_from_dict(prs)
 add_headers_and_print_hashes(prs)
-# save_presentation(prs)
+save_presentation(prs)
 
 # go through all slides and add the hashed sender name to a list
 all_senders = []
@@ -533,11 +533,8 @@ duplicates = [item for item in senders if senders.count(item) > 1]
 # remove duplicates from list
 senders = list(dict.fromkeys(duplicates))
 
+print("The following senders appear in more than one section in the presentation:")
 for sender in senders:
     positions = [i+1 for i, x in enumerate(all_senders) if x == sender]
     grouped_positions = group_consecutive_numbers(positions)
-    print("The following senders appear in more than one section in the presentation:")
     print(f'{sender} appears at pages {", ".join(grouped_positions)}')
-
-
-save_presentation(prs)
