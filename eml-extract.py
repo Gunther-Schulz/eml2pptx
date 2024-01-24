@@ -443,8 +443,9 @@ def convert_pdfs_to_images(pdf_filepaths, output_dir):
         for i, pdf_image in enumerate(pdf_images):
             pdf_image = crop_whitespace(pdf_image)
             image_filepath = f'{output_dir}/{os.path.basename(pdf_filepath)}_{i}.png'
-            pdf_image.save(image_filepath, 'PNG')
-            images.append(image_filepath)
+            if pdf_image is not None:
+                pdf_image.save(image_filepath, 'PNG')
+                images.append(image_filepath)
     return images
 
 def create_pdf(message_content, output_dir, filename):
