@@ -74,17 +74,17 @@ def image_basename(image):
     return os.path.splitext(os.path.basename(image))[0]
 
 def hash_image_name(image_name):
-    name = image_basename(image_name)
-    hasher = hashlib.md5()
-    hasher.update(name.encode('utf-8'))
-    unique_representation = hasher.hexdigest()
+    # name = image_basename(image_name)
+    # hasher = hashlib.md5()
+    # hasher.update(name.encode('utf-8'))
+    # unique_representation = hasher.hexdigest()
     # return "hash_image_" + unique_representation
     return image_name
 
 def hash_sender_name(sender):  
-    hasher = hashlib.md5()
-    hasher.update(sender.encode('utf-8'))
-    unique_representation = hasher.hexdigest()
+    # hasher = hashlib.md5()
+    # hasher.update(sender.encode('utf-8'))
+    # unique_representation = hasher.hexdigest()
     # return "hash_sender_" + unique_representation
     return sender
 
@@ -262,7 +262,7 @@ def crop_whitespace(image):
 def add_image(slide, image_filepath):
     # Define the maximum height and width
     max_height = Cm(18)
-    max_width = Cm(13.5)
+    max_width = Cm(14)
 
     # Open the image and get its size
     image = Image.open(image_filepath)
@@ -284,7 +284,7 @@ def add_image(slide, image_filepath):
 
     # Add the image to the slide
     top = Cm(1.6)
-    left = Cm(1)
+    left = Cm(0.5)
     pic = slide.shapes.add_picture(image_filepath, left, top, height=height, width=width)
 
     # # Crop the image
@@ -294,12 +294,16 @@ def add_image(slide, image_filepath):
     # pic.crop_bottom = 0
 
 # Function that adds a string to the top left of the slide
-def add_text(slide, text):
-    left = top = width = height = Cm(1)
+def add_source_text(slide, text):
+    left = Cm(1.6)
+    top = Cm(20)
+    width = Cm(13.5)
+    height = Cm(1)
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
     tf.text = text
-    tf.paragraphs[0].font.size = Pt(6)
+    for paragraph in tf.paragraphs:
+        paragraph.font.size = Pt(6)
 
 def add_divider_line(slide, prs):
     left = prs.slide_width // 2
@@ -573,7 +577,13 @@ def create_presentation_from_dict(prs):
             remove_title_placeholder(slide)
             add_header_left(slide)
             add_image(slide, image)
-            add_text(slide, f'Quelle: {sender} - {image_basename(image)}')
+            text = f'Quelle: {sender} - {image_basename(image)}'
+            if len(text) > 120:
+                space_index = text.rfind(' ', 0, 120)
+                if space_index != -1:
+                    text = text[:space_index] + "\n" + text[space_index+1:]
+
+            add_source_text(slide, text)
             add_text_box(slide)
             add_divider_line(slide, prs)
 
