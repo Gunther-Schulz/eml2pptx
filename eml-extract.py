@@ -3,6 +3,7 @@ import email
 from email import policy
 from email.parser import BytesParser
 from email.utils import parsedate_to_datetime
+import shutil
 from weasyprint import HTML
 from pdf2image import convert_from_path
 from PIL import Image
@@ -17,6 +18,8 @@ import re
 import hashlib
 import json
 
+# TODO: implenet adding slides from scanned files (no email)
+
 # conda install conda-forge::weasyprint 
 
 # check version of pptx library
@@ -30,6 +33,7 @@ output_dir = './output'
 font_path = "/Library/Fonts/Arial.ttf"
 page_count = 0
 slides_dict = {}
+regex_right_header = re.compile(r"Seite \d+/\d+") # regex to match the right header
 
 # Create output directory if it doesn't exist
 if not os.path.exists(output_dir):
@@ -107,11 +111,12 @@ def write_default_json_config_to_text_frame(slide):
 
 def write_config_to_text_frame(slide, key, value):
     json_text_box = None
+    regex_json = re.compile(r"^{.*}$")
     # search all text boxes and find the first one that contains json
     for shape in slide.shapes:
         if shape.has_text_frame:
             text_frame = shape.text_frame
-            if text_frame.text.startswith("{"):
+            if regex_json.match(text_frame.text):
                 json_text_box = text_frame
                 break
     # get the json from the text box and update it
@@ -363,18 +368,20 @@ def create_pdf(html_content, output_dir, filename):
     return filepath
 
 def process_eml_files(input_dir, output_dir):
-    page_count = 0
     for filename in os.listdir(input_dir):
         if filename.endswith('.eml'):
-            page_count = process_single_eml_file(filename, output_dir, page_count)
-    return page_count
+            process_single_eml_file(filename, output_dir)
+    return
 
-def process_single_eml_file(filename, output_dir, page_count):
+def process_single_eml_file(filename, output_dir):
     with open(f'./eml/{filename}', 'rb') as f:
         msg = BytesParser(policy=policy.default).parse(f)
     
     sender = email.utils.parseaddr(msg['From'])[1]
     sender_dir, attachments_dir, text_dir, attachments_img_dir, text_img_dir = create_directories(output_dir, sender)
+
+    # copy the eml file to the sender directory
+    shutil.copy(f'./eml/{filename}', sender_dir)
 
     html_content = get_html_content(msg)
     if html_content is None:
@@ -391,21 +398,20 @@ def process_single_eml_file(filename, output_dir, page_count):
     all_images = text_images + attachment_images
 
     for image in all_images:
-        page_count += 1
         
         hashed_image_name = hash_image_name(image)
         hashed_sender_name = hash_sender_name(sender)
 
         if not is_duplicate_image(hashed_image_name):
-            add_image_to_presentation(image, hashed_image_name, hashed_sender_name, page_count)
+            add_image_to_presentation(image, hashed_image_name, hashed_sender_name)
 
-    return page_count
+    return
 
 def is_duplicate_image(hash_image_name):
     # return any(read_from_slide_note(slide, "hashed_image_name") == hashed_image_name for slide in prs.slides)
     return any(read_config_from_text_frame(slide, "hash_image_name") == hash_image_name for slide in prs.slides)
 
-def add_image_to_presentation(image, hashed_image_name, hashed_sender_name, page_count):
+def add_image_to_presentation(image, hashed_image_name, hashed_sender_name):
     # Check if the sender already exists in the dictionary
     if hashed_sender_name in slides_dict:
         # Add the image to the sender's list
@@ -434,13 +440,20 @@ def create_presentation_from_dict(prs):
             remove_title_placeholder(slide)
             add_header_left(slide)
             add_image(slide, image)
-            add_text(slide, f'{image_basename(image)}')
+            add_text(slide, f'Quelle: {sender} - {image_basename(image)}')
             add_text_box(slide)
             add_divider_line(slide, prs)
 
 
-def add_headers_and_print_hashes(prs, page_count):
+def add_headers_and_print_hashes(prs):
+    page_count = len(prs.slides)
     for i, slide in enumerate(prs.slides):
+        # if right header exists, remove it
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                text_frame = shape.text_frame
+                if regex_right_header.match(text_frame.text):
+                    slide.shapes._spTree.remove(shape._element)
         add_header_right(slide, i+1, page_count)
 
     # for i, slide in enumerate(prs.slides):
@@ -454,27 +467,40 @@ def add_headers_and_print_hashes(prs, page_count):
 def save_presentation(prs):
     prs.save(presentation_filename)
 
+def group_consecutive_numbers(numbers):
+    ranges = []
+    for n in numbers:
+        if not ranges or n > ranges[-1][-1] + 1:
+            ranges.append([n])
+        else:
+            ranges[-1].append(n)
+    return ['{}-{}'.format(r[0], r[-1]) if len(r) > 1 else str(r[0]) for r in ranges]
+
+
 # Usage
-page_count = process_eml_files(input_dir, output_dir)
+process_eml_files(input_dir, output_dir)
 create_presentation_from_dict(prs)
-add_headers_and_print_hashes(prs, page_count)
+add_headers_and_print_hashes(prs)
 # save_presentation(prs)
 
 # go through all slides and add the hashed sender name to a list
-senders = []
+all_senders = []
 for i, slide in enumerate(prs.slides):
     hashed_image_name = read_config_from_text_frame(slide, "hash_image_name")
     hashed_sender_name = read_config_from_text_frame(slide, "hash_sender_name")
-    senders.append(hashed_sender_name)
+    all_senders.append(hashed_sender_name)
 # update list so that if adjecent elments are the same, they are replaced by a single element
-senders = [x for i, x in enumerate(senders) if i == 0 or x != senders[i-1]]
+senders = [x for i, x in enumerate(all_senders) if i == 0 or x != all_senders[i-1]]
 # show which elements appear more than once in th elist
 duplicates = [item for item in senders if senders.count(item) > 1]
 # remove duplicates from list
 senders = list(dict.fromkeys(duplicates))
-if senders:
-    print(" ")
-    print("The following senders appear in more than one section in the presentation (most likely they got added toward the end):")
-    print(', '.join(map(str, senders)))
+
+for sender in senders:
+    positions = [i+1 for i, x in enumerate(all_senders) if x == sender]
+    grouped_positions = group_consecutive_numbers(positions)
+    print("The following senders appear in more than one section in the presentation:")
+    print(f'{sender} appears at pages {", ".join(grouped_positions)}')
+
 
 save_presentation(prs)
