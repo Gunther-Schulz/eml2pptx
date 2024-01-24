@@ -205,22 +205,17 @@ def get_html_content(msg):
     for type in text_types:
         if msg.is_multipart():
             for part in msg.iter_parts():
-                print("mp",part.get_content_type(), part.get('Content-Disposition'))
                 if part.get_content_type() == type:
                     # if Content-Disposition is attachment, skip
                     if part.get('Content-Disposition') and part.get('Content-Disposition') != "inline":
-                        print("skipping attachment")
                         continue
                     reply = remove_quoted(part.get_content())
                     if reply:
-                        print('Found quoted reply')
-                        # print(reply)
                         return {"type": type, "content": reply}
                     return {"type": type, "content": part.get_content()}
                 elif part.is_multipart():
                     return get_html_content(part)   
         else:
-            print("single",msg.get_content_type(), msg.get('Content-Disposition'))
             if msg.get_content_type() == type:
                 if msg.get('Content-Disposition') and msg.get('Content-Disposition') != "inline":
                     continue
@@ -380,7 +375,6 @@ def handle_pdf(part, msg, output_dir):
     if payload is not None:
         attachment_filename = part.get_filename()
         if is_in_blacklist(attachment_filename):
-            print(f'Found blacklisted PDF attachment: {attachment_filename}')
             return None
         formatted_date =  get_email_date(msg)
         filename, file_extension = os.path.splitext(attachment_filename)
@@ -418,6 +412,7 @@ def handle_other_attachments(part, msg, output_dir):
 def is_in_blacklist(filename):
     for regex in pdf_blacklist:
         if regex.match(filename):
+            print(f'Found blacklisted file: {filename}')
             return True
     return False
 
@@ -444,7 +439,6 @@ def convert_pdfs_to_images(pdf_filepaths, output_dir):
         pdf_images = convert_from_path(pdf_filepath)
         # Save each image under the output directory
         for i, pdf_image in enumerate(pdf_images):
-            # print(f'Converting {pdf_filepath} to image {i+1}')
             pdf_image = crop_whitespace(pdf_image)
             image_filepath = f'{output_dir}/{os.path.basename(pdf_filepath)}_{i}.png'
             pdf_image.save(image_filepath, 'PNG')
@@ -456,13 +450,10 @@ def create_pdf(message_content, output_dir, filename):
     type = message_content["type"]
     # Check if the content is HTML or plain text
     if type == "text/plain":
-        # print('Content is TEXT', filename)
         # The content is plain text
         # Set a maximum width to fit the content within an A4 page
         content = escape(content).replace('\n', '<br>')
         content = '<p style="word-wrap: break-word; max-width: 595px; font-size: 10pt;">{}</p>'.format(content)
-    # else:
-    #     print('Content is HTML', filename)
     filepath = f'{output_dir}/{filename}.pdf'
     # Create a PDF of the email and save it under the new directory
     HTML(string=content).write_pdf(filepath)
