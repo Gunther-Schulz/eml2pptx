@@ -109,37 +109,35 @@ def write_default_json_config_to_text_frame(slide):
     text_frame.paragraphs[0].font.size = Pt(1)
     text_frame.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)
  
-
-def write_config_to_text_frame(slide, key, value):
-    json_text_box = None
-    regex_json = re.compile(r"^{.*}$")
+def get_json_text_box(slide):
     # search all text boxes and find the first one that contains json
+    regex_json = re.compile(r"^{.*}$")
     for shape in slide.shapes:
         if shape.has_text_frame:
             text_frame = shape.text_frame
             if regex_json.match(text_frame.text):
-                json_text_box = text_frame
-                break
+                return text_frame
+    return None
+
+def write_config_to_text_frame(slide, key, value):
+    json_text_box = get_json_text_box(slide)
+    if json_text_box is None:
+        return
     # get the json from the text box and update it
     existing_json = json.loads(json_text_box.text)
     existing_json[key] = value
     # write the updated json back to the text box
     json_text_box.text = json.dumps(existing_json)
-    text_frame.paragraphs[0].font.size = Pt(1)
-    text_frame.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)
+    json_text_box.paragraphs[0].font.size = Pt(1)
+    json_text_box.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)
 
 def read_config_from_text_frame(slide, key):
-    json_text_box = None
-    # search all text boxes and find the first one that contains json
-    for shape in slide.shapes:
-        if shape.has_text_frame:
-            text_frame = shape.text_frame
-            if text_frame.text.startswith("{"):
-                json_text_box = text_frame
-                break
-    # get the json from the text box and update it
+    json_text_box = get_json_text_box(slide)
+    if json_text_box is None:
+        return None
+    # get the json from the text box
     existing_json = json.loads(json_text_box.text)
-    return existing_json[key]
+    return existing_json.get(key, None)
 
 # def write_to_slide_note(slide, key, value):
 #     # Read the existing content
