@@ -28,7 +28,8 @@ import json
 presentation_filename = 'presentation.pptx'
 
 text_types = ['text/plain', 'text/html']
-input_dir = './eml'
+eml_input_dir = './eml'
+scanned_input_dir = './scanned'
 output_dir = './output'
 font_path = "/Library/Fonts/Arial.ttf"
 page_count = 0
@@ -367,6 +368,43 @@ def create_pdf(html_content, output_dir, filename):
     HTML(string=html_content).write_pdf(filepath)
     return filepath
 
+def process_directory_files(input_dir, output_dir):
+    # Iterate over all subdirectories of input_dir
+    for root, dirs, files in os.walk(input_dir):
+        for dir in dirs:
+            dir_path = os.path.join(root, dir)
+            
+            # Read the JSON file
+            with open(os.path.join(dir_path, "info.json"), 'r') as f:
+                info = json.load(f)
+
+            sender = info['From']
+            sender_dir, attachments_dir, text_dir, attachments_img_dir, text_img_dir = create_directories(output_dir, sender)
+
+            # copy the json file to the sender directory
+            shutil.copy(os.path.join(dir_path, "info.json"), sender_dir)
+
+            attachment_filepaths = []
+
+            # Iterate over all PDF files in the directory
+            for file in os.listdir(dir_path):
+                if file.endswith(".pdf"):
+                    # Save the filepath
+                    attachment_filepaths.append(os.path.join(dir_path, file))
+
+            attachment_images = convert_pdfs_to_images(attachment_filepaths, attachments_img_dir)
+
+            for image in attachment_images:
+                
+                hashed_image_name = hash_image_name(image)
+                hashed_sender_name = hash_sender_name(sender)
+
+                if not is_duplicate_image(hashed_image_name):
+                    add_image_to_presentation(image, hashed_image_name, hashed_sender_name)
+
+            return
+
+
 def process_eml_files(input_dir, output_dir):
     for filename in os.listdir(input_dir):
         if filename.endswith('.eml'):
@@ -478,7 +516,8 @@ def group_consecutive_numbers(numbers):
 
 
 # Usage
-process_eml_files(input_dir, output_dir)
+process_eml_files(eml_input_dir, output_dir)
+process_directory_files(scanned_input_dir, output_dir)
 create_presentation_from_dict(prs)
 add_headers_and_print_hashes(prs)
 # save_presentation(prs)
