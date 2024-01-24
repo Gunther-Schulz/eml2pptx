@@ -255,6 +255,8 @@ def crop_whitespace(image):
     diff = ImageChops.add(diff, diff, 2.0, -100)
     bbox = diff.getbbox()
     if bbox:
+        # Modify the bounding box to keep the full width of the image
+        bbox = (0, bbox[1], image.size[0], bbox[3])
         return image.crop(bbox)
 
 def add_image(slide, image_filepath):
@@ -285,11 +287,11 @@ def add_image(slide, image_filepath):
     left = Cm(1)
     pic = slide.shapes.add_picture(image_filepath, left, top, height=height, width=width)
 
-    # Crop the image
-    pic.crop_left = 0
-    pic.crop_top = 0
-    pic.crop_right = 0
-    pic.crop_bottom = 0
+    # # Crop the image
+    # pic.crop_left = 0
+    # pic.crop_top = 0
+    # pic.crop_right = 0
+    # pic.crop_bottom = 0
 
 # Function that adds a string to the top left of the slide
 def add_text(slide, text):
@@ -453,7 +455,7 @@ def create_pdf(message_content, output_dir, filename):
         # The content is plain text
         # Set a maximum width to fit the content within an A4 page
         content = escape(content).replace('\n', '<br>')
-        content = '<p style="word-wrap: break-word; max-width: 595px; font-size: 10pt;">{}</p>'.format(content)
+        content = '<p style="word-wrap: break-word; max-width: 595px; font-size: 14pt;">{}</p>'.format(content)
     filepath = f'{output_dir}/{filename}.pdf'
     # Create a PDF of the email and save it under the new directory
     HTML(string=content).write_pdf(filepath)
