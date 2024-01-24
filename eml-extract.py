@@ -32,6 +32,17 @@ from PIL import ImageChops
 # pip show python-pptx
 
 presentation_filename = 'presentation.pptx'
+header_title = 'Abwägungsvorschlag Träger öffentlicher Belange, B-Plan XX “XXXX“'
+
+# create a regex for "Anschreiben-21", "Anschreiben-8", "Anschreiben-688" etc.
+regex_blacklist_1 = re.compile(r"Anschreiben-\d+")
+# create a regex for "23 09.14. Praesentation Baebelitz"
+regex_blacklist_2 = re.compile(r"[0-9.]*.*Praesentation Baebelitz")
+# create a regex for "23 09.08. Baebelitz-Layout1"
+regex_blacklist_3 = re.compile(r"[0-9.]*.*Baebelitz-Layout\d+")
+# create a regex for "Uebertragung"
+regex_blacklist_4 = re.compile(r"Uebertragung")
+pdf_blacklist = [regex_blacklist_1, regex_blacklist_2, regex_blacklist_3, regex_blacklist_4]    
 
 text_types = ['text/plain', 'text/html']
 eml_input_dir = './eml'
@@ -227,7 +238,7 @@ def add_header_left(slide):
     # Add a header to the slide
     header = slide.shapes.add_textbox(Cm(1), 0, prs.slide_width - Cm(2), Cm(1))
     tf = header.text_frame
-    tf.text = "Abwägungsvorschlag Träger öffentlicher Belange, B-Plan XX “XXXX“"
+    tf.text = header_title
     tf.paragraphs[0].font.size = Pt(size)
     tf.paragraphs[0].font.bold = bold
     tf.paragraphs[0].alignment = PP_ALIGN.LEFT
@@ -368,6 +379,9 @@ def handle_pdf(part, msg, output_dir):
     payload = part.get_payload(decode=True)
     if payload is not None:
         attachment_filename = part.get_filename()
+        if is_in_blacklist(attachment_filename):
+            print(f'Found blacklisted PDF attachment: {attachment_filename}')
+            return None
         formatted_date =  get_email_date(msg)
         filename, file_extension = os.path.splitext(attachment_filename)
         filename_with_date = f"{filename}_{formatted_date}{file_extension}"
@@ -380,6 +394,8 @@ def handle_zip(part, msg, output_dir):
     payload = part.get_payload(decode=True)
     if payload is not None:
         attachment_filename = part.get_filename()
+        if is_in_blacklist(attachment_filename):
+            return None
         filepath = os.path.join(output_dir, attachment_filename)
         print(f'Found zip file. Saving to: {attachment_filename} in path {filepath}')
         with open(filepath, 'wb') as f:
@@ -389,6 +405,8 @@ def handle_other_attachments(part, msg, output_dir):
     payload = part.get_payload(decode=True)
     if payload is not None:
         attachment_filename = part.get_filename()
+        if is_in_blacklist(attachment_filename):
+            return None
         filepath = os.path.join(output_dir, attachment_filename)
         if attachment_filename.endswith('.pdf'):
             print(f'Found PDF attachment with from MIME type. Saving to: {attachment_filename} in path {filepath}')
@@ -397,12 +415,20 @@ def handle_other_attachments(part, msg, output_dir):
         with open(filepath, 'wb') as f:
             f.write(payload)
 
+def is_in_blacklist(filename):
+    for regex in pdf_blacklist:
+        if regex.match(filename):
+            return True
+    return False
+
 def save_attachments(msg, output_dir):
     filepaths = []
     if msg.is_multipart():
         for part in msg.iter_parts():
             if part.get_content_type() == 'application/pdf': #or part.get_content_type() == 'application/zip':
-                filepaths.append(handle_pdf(part, msg, output_dir))
+                fp = handle_pdf(part, msg, output_dir)
+                if fp is not None:
+                    filepaths.append(fp)
             elif part.get_content_type() == 'application/zip':
                handle_zip(part, msg, output_dir)
             elif part.get('Content-Disposition') and part.get_filename() is not None:
