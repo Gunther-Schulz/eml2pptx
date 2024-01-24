@@ -17,6 +17,12 @@ from pptx.enum.shapes import PP_PLACEHOLDER
 import re
 import hashlib
 import json
+from bs4 import BeautifulSoup
+# import email-reply-parser
+from email_reply_parser import EmailReplyParser
+from html import escape
+from PIL import Image
+from PIL import ImageChops
 
 # TODO: implenet adding slides from scanned files (no email)
 
@@ -170,24 +176,50 @@ def read_config_from_text_frame(slide, key):
 #     return existing_json[key]
 
 def sanitize_filename(filename):
-    return re.sub(r'[\\/*?:"<>|]', '_', filename)
+    return re.sub(r'[\\/*?:"<>|\[\]]', '_', filename)
 
+def remove_quoted(email_message):
+    parser = EmailReplyParser()
+    email_message = parser.parse_reply(email_message)
+
+    lines = email_message.split('\n')
+    non_quoted_lines = []
+    for line in lines:
+        if line.startswith(('Von:', 'Gesendet:', 'An:', 'Betreff:')):
+            break
+        non_quoted_lines.append(line)
+    return '\n'.join(non_quoted_lines)
 
 def get_html_content(msg):
-    if msg.is_multipart():
-        for part in msg.iter_parts():
-            if part.get_content_type() in text_types:
-                return part.get_content()
-            elif part.is_multipart():
-                return get_html_content(part)
-    else:
-        if msg.get_content_type() == 'text/html':
-            return msg.get_content()
+    for type in text_types:
+        if msg.is_multipart():
+            for part in msg.iter_parts():
+                print("mp",part.get_content_type(), part.get('Content-Disposition'))
+                if part.get_content_type() == type:
+                    # if Content-Disposition is attachment, skip
+                    if part.get('Content-Disposition') and part.get('Content-Disposition') != "inline":
+                        print("skipping attachment")
+                        continue
+                    reply = remove_quoted(part.get_content())
+                    if reply:
+                        print('Found quoted reply')
+                        # print(reply)
+                        return {"type": type, "content": reply}
+                    return {"type": type, "content": part.get_content()}
+                elif part.is_multipart():
+                    return get_html_content(part)   
+        else:
+            print("single",msg.get_content_type(), msg.get('Content-Disposition'))
+            if msg.get_content_type() == type:
+                if msg.get('Content-Disposition') and msg.get('Content-Disposition') != "inline":
+                    continue
+                reply = remove_quoted(msg.get_content())
+                if reply:
+                    return {"type": type, "content": reply}
+                return {"type": type, "content": msg.get_content()}
+
 
     return None
-
-from PIL import Image
-from PIL import ImageChops
 
 def add_header_left(slide):
     bold = False
@@ -220,24 +252,27 @@ def crop_whitespace(image):
         return image.crop(bbox)
 
 def add_image(slide, image_filepath):
+    # Define the maximum height and width
+    max_height = Cm(18)
+    max_width = Cm(13.5)
+
     # Open the image and get its size
     image = Image.open(image_filepath)
     image_width, image_height = image.size
     aspect_ratio = image_width / image_height
 
-    # Define the maximum height and width
-    max_height = Cm(18)
-    max_width = Cm(13)
-
     # Calculate the height and width, maintaining the aspect ratio
-    if aspect_ratio > 1:
-        # Image is wider than it is tall
-        width = max_width
-        height = width / aspect_ratio
-    else:
-        # Image is taller than it is wide
+    width_by_height = max_height * aspect_ratio
+    height_by_width = max_width / aspect_ratio
+
+    if width_by_height <= max_width:
+        # Image fits within max dimensions by adjusting height
+        width = width_by_height
         height = max_height
-        width = height * aspect_ratio
+    else:
+        # Image fits within max dimensions by adjusting width
+        width = max_width
+        height = height_by_width
 
     # Add the image to the slide
     top = Cm(1.6)
@@ -329,22 +364,51 @@ def get_email_date(msg):
     formatted_date_time = email_date.strftime('%Y-%m-%d_%H_%M_%S')
     return formatted_date_time
 
+def handle_pdf(part, msg, output_dir):
+    payload = part.get_payload(decode=True)
+    if payload is not None:
+        attachment_filename = part.get_filename()
+        formatted_date =  get_email_date(msg)
+        filename, file_extension = os.path.splitext(attachment_filename)
+        filename_with_date = f"{filename}_{formatted_date}{file_extension}"
+        filepath = os.path.join(output_dir, filename_with_date)
+        with open(filepath, 'wb') as f:
+            f.write(payload)
+        return filepath
+
+def handle_zip(part, msg, output_dir):
+    payload = part.get_payload(decode=True)
+    if payload is not None:
+        attachment_filename = part.get_filename()
+        filepath = os.path.join(output_dir, attachment_filename)
+        print(f'Found zip file. Saving to: {attachment_filename} in path {filepath}')
+        with open(filepath, 'wb') as f:
+            f.write(payload)
+
+def handle_other_attachments(part, msg, output_dir):
+    payload = part.get_payload(decode=True)
+    if payload is not None:
+        attachment_filename = part.get_filename()
+        filepath = os.path.join(output_dir, attachment_filename)
+        if attachment_filename.endswith('.pdf'):
+            print(f'Found PDF attachment with from MIME type. Saving to: {attachment_filename} in path {filepath}')
+            return handle_pdf(part, msg, output_dir)
+        print(f'Found non-PDF attachment. Saving to: {attachment_filename} in path {filepath}')
+        with open(filepath, 'wb') as f:
+            f.write(payload)
+
 def save_attachments(msg, output_dir):
     filepaths = []
     if msg.is_multipart():
         for part in msg.iter_parts():
-            if part.get_content_type() not in text_types:
-                payload = part.get_payload(decode=True)
-                if payload is not None:
-                    attachment_filename = part.get_filename()
-                    formatted_date =  get_email_date(msg)
-                    filename, file_extension = os.path.splitext(attachment_filename)
-                    # Include the date in the filename
-                    filename_with_date = f"{filename}_{formatted_date}{file_extension}"
-                    filepath = os.path.join(output_dir, filename_with_date)
-                    with open(filepath, 'wb') as f:
-                        f.write(payload)
-                    filepaths.append(filepath)
+            if part.get_content_type() == 'application/pdf': #or part.get_content_type() == 'application/zip':
+                filepaths.append(handle_pdf(part, msg, output_dir))
+            elif part.get_content_type() == 'application/zip':
+               handle_zip(part, msg, output_dir)
+            elif part.get('Content-Disposition') and part.get_filename() is not None:
+               fp = handle_other_attachments(part, msg, output_dir)
+               if fp is not None:
+                   filepaths.append(fp)
     return filepaths
 
 def convert_pdfs_to_images(pdf_filepaths, output_dir):
@@ -354,16 +418,28 @@ def convert_pdfs_to_images(pdf_filepaths, output_dir):
         pdf_images = convert_from_path(pdf_filepath)
         # Save each image under the output directory
         for i, pdf_image in enumerate(pdf_images):
+            # print(f'Converting {pdf_filepath} to image {i+1}')
             pdf_image = crop_whitespace(pdf_image)
             image_filepath = f'{output_dir}/{os.path.basename(pdf_filepath)}_{i}.png'
             pdf_image.save(image_filepath, 'PNG')
             images.append(image_filepath)
     return images
 
-def create_pdf(html_content, output_dir, filename):
+def create_pdf(message_content, output_dir, filename):
+    content = message_content["content"]
+    type = message_content["type"]
+    # Check if the content is HTML or plain text
+    if type == "text/plain":
+        # print('Content is TEXT', filename)
+        # The content is plain text
+        # Set a maximum width to fit the content within an A4 page
+        content = escape(content).replace('\n', '<br>')
+        content = '<p style="word-wrap: break-word; max-width: 595px; font-size: 10pt;">{}</p>'.format(content)
+    # else:
+    #     print('Content is HTML', filename)
     filepath = f'{output_dir}/{filename}.pdf'
     # Create a PDF of the email and save it under the new directory
-    HTML(string=html_content).write_pdf(filepath)
+    HTML(string=content).write_pdf(filepath)
     return filepath
 
 def process_directory_files(input_dir, output_dir):
@@ -419,12 +495,13 @@ def process_single_eml_file(filename, output_dir):
     # copy the eml file to the sender directory
     shutil.copy(f'./eml/{filename}', sender_dir)
 
-    html_content = get_html_content(msg)
-    if html_content is None:
-        print(f'No HTML content found in {filename}')
+    message_content = get_html_content(msg)
+
+    if message_content is None:
+        print(f'No HTML/Text content found in {filename}')
     filename = sanitize_filename(filename)
 
-    text_filepath = create_pdf(html_content, text_dir, filename)
+    text_filepath = create_pdf(message_content, text_dir, filename)
     text_images = convert_pdfs_to_images([text_filepath], text_img_dir)
     
     attachment_filepaths = save_attachments(msg, attachments_dir)
@@ -465,7 +542,7 @@ def create_presentation_from_dict(prs):
             hashed_image_name = hash_image_name(image)
             # if not is_duplicate_image(hashed_image_name):
             # Add a new slide at the end
-            print(f'Adding slide nr. {i} {image} to slide with hashes {hashed_image_name}')
+            # print(f'Adding slide nr. {i} {image} to slide with hashes {hashed_image_name}')
             slide = prs.slides.add_slide(prs.slide_layouts[5])
             # write_default_json_to_notes(slide)
             # write_to_slide_note(slide, "hashed_image_name", hashed_image_name)
