@@ -1,0 +1,16 @@
+name: eml2pptx
+channels:
+  - conda-forge
+  - anaconda
+  - defaults
+dependencies:
+  - weasyprint=60.2=pyhd8ed1ab_0
+  - pip:
+      - email_reply_parser==0.5.12
+      - pdf2image==1.17.0
+      - Pillow==10.0.1
+      - Pillow==10.2.0
+      - python_pptx==0.6.23
+      - PyYAML==6.0.1
+
+prefix: /opt/homebrew/anaconda3/envs/töb
