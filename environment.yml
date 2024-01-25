@@ -6,7 +6,7 @@ channels:
 dependencies:
   - weasyprint=60.2=pyhd8ed1ab_0
   - pip:
-      - email_reply_parser==0.5.12
+      - mail-parser-reply
       - pdf2image==1.17.0
       - Pillow==10.0.1
       - Pillow==10.2.0

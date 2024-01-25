@@ -51,6 +51,8 @@ python eml2pptx.py
 
 The output .pptx files are placed in the directory specified in the configuration.
 
-## Adding more input files (.eml and .pdf)
+## Updating the presentation
 
-The script will only process files that have not been processed before. To process more files, simply add them to the input directories and rerun the script. New slides will be added to the existing .pptx file. Unfortunately, there is no way to insert a new slide at an arbitrary position in a .pptx file, so the slides will be appended to the end of the file.
+### Adding/removing input files (.eml and .pdf)
+
+The script will only process files that have not been processed before. To process more files, simply add them to the input directories and rerun the script. New slides will be added to the existing .pptx file. Unfortunately, there is no way to insert a new slide at an arbitrary position in a .pptx file, so the slides will be appended to the end of the file. Also, the underlying python-pptx library handling the .pptx files does not support deleting slides, so if you want to remove slides, you will have to do so manually.
