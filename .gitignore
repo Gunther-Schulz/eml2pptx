@@ -1,7 +1,7 @@
 
 .DS_Store
 eml/
-output/
+extracted/
 scanned/
 config.yaml
 
@@ -11,3 +11,5 @@ config.yaml
 presentation.pptx
 
 processed_slides.json
+
+__pycache__/
