@@ -15,6 +15,7 @@ config = load_config()
 presentation_filename = config['presentation_filename']
 header_title = config['header_title']
 default_comment = config['default_comment']
+page_string = config['page_string']
 
 slides_dict = {}
 regex_right_header = re.compile(r"Seite \d+/\d+")
@@ -54,7 +55,7 @@ def add_header_right(slide, page_number, total_pages):
     size = 10
     header = slide.shapes.add_textbox(Cm(1), 0, prs.slide_width - Cm(2), Cm(1))
     tf = header.text_frame
-    tf.text = f'Seite {page_number}/{total_pages}'
+    tf.text = page_string % (page_number, total_pages)
     tf.paragraphs[0].font.size = Pt(size)
     tf.paragraphs[0].font.bold = bold
     tf.paragraphs[0].alignment = PP_ALIGN.RIGHT

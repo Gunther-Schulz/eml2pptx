@@ -19,6 +19,7 @@ def load_config():
             f.write('eml_input_dir: eml\n')
             f.write('scanned_input_dir: scanned\n')
             f.write('output_dir: extracted\n')
+            f.write('page_string: "Seite %d von %d"\n')
             # f.write('font_path: "/Library/Fonts/Arial.ttf"\n')
         print("Please configure config.yaml and run the script again.")
         exit()
@@ -34,6 +35,7 @@ def load_config():
 config = load_config()
 pdf_blacklist = config['pdf_blacklist']
 output_dir = config['output_dir']
+presentation_filename = config['presentation_filename']
 
 processed_slides_file = 'processed_slides.json'
 
@@ -46,7 +48,7 @@ def image_basename(image):
     return os.path.splitext(os.path.basename(image))[0]
 
 
-if not os.path.exists(processed_slides_file):
+if not os.path.exists(processed_slides_file) or not os.path.exists(presentation_filename):
     with open(processed_slides_file, 'w') as f:
         json.dump({'processed_slides': []}, f)
 

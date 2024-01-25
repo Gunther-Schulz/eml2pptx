@@ -5,16 +5,16 @@ import os
 import shutil
 from lib.config_manager import get_email_date, is_in_blacklist, load_config, create_directories, sanitize_filename
 from mailparser_reply import EmailReplyParser
-
 from lib.pdf_processing import convert_pdfs_to_images, create_pdf
 from lib.presentation import add_image_to_presentation, is_duplicate
 
 
 config = load_config()
-
-text_content_types = ['text/plain', 'text/html']
 output_dir = config['output_dir']
 eml_input_dir = config['eml_input_dir']
+
+# The ordfer ist important. The first content type will be used if multiple are found
+text_content_types = ['text/plain', 'text/html']
 
 
 def process_eml_files():

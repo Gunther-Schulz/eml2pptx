@@ -4,10 +4,6 @@ import os
 from pdf2image import convert_from_path
 from weasyprint import HTML
 from PIL import Image, ImageChops
-from lib.config_manager import load_config
-
-
-config = load_config()
 
 
 def convert_pdfs_to_images(pdf_filepaths, output_dir):
