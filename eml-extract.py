@@ -76,17 +76,46 @@ else:
 prs.slide_width = Mm(297)
 prs.slide_height = Mm(210)
 
+processed_slides_file = 'processed_slides.json'
+
+if not os.path.exists(processed_slides_file):
+    with open(processed_slides_file, 'w') as f:
+        json.dump({'processed_slides': []}, f)
+
 
 def image_basename(image):
     return os.path.splitext(os.path.basename(image))[0]
 
 
-def get_image_name(image):
-    return image
+# def get_image_name(image):
+#     return image
 
 
-def get_sender_name(sender):
-    return sender
+# def get_sender_name(sender):
+#     return sender
+
+
+def get_slide_id(image, sender):
+    # image_name = get_image_name(image)
+    # sender_name = get_sender_name(sender)
+    # slide_id = hashlib.md5(
+    #     (image_name + sender_name).encode('utf-8')).hexdigest()
+    slide_id = image + "_&_" + sender
+    return slide_id
+
+
+def get_processed_slides():
+    with open(processed_slides_file) as f:
+        data = json.load(f)
+        return data['processed_slides']
+
+
+def write_processed_slide(slide_id):
+    with open(processed_slides_file, 'r+') as f:
+        data = json.load(f)
+        data['processed_slides'].append(slide_id)
+        f.seek(0)
+        json.dump(data, f)
 
 
 def write_default_json_config_to_text_frame(slide):
@@ -94,10 +123,10 @@ def write_default_json_config_to_text_frame(slide):
     text_frame = slide.shapes.add_textbox(Cm(0.1), Cm(0), Cm(0.1), Cm(
         0.1)).text_frame  # Parameters are left, top, width, height
     # write default json to it
-    default_for_json = {"image_name": "default",
-                        "hashed_sender_name": "default"}
-    json_hashed_image_name = json.dumps(default_for_json)
-    text_frame.text = json_hashed_image_name
+    default_for_json = {"image": "default",
+                        "sender": "default"}
+    json_image = json.dumps(default_for_json)
+    text_frame.text = json_image
     text_frame.paragraphs[0].font.size = Pt(1)
     text_frame.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)
 
@@ -113,7 +142,7 @@ def get_json_text_box(slide):
     return None
 
 
-def write_config_to_text_frame(slide, key, value):
+def write_config(slide, key, value):
     json_text_box = get_json_text_box(slide)
     if json_text_box is None:
         return
@@ -126,7 +155,7 @@ def write_config_to_text_frame(slide, key, value):
     json_text_box.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)
 
 
-def read_config_from_text_frame(slide, key):
+def read_config(slide, key):
     json_text_box = get_json_text_box(slide)
     if json_text_box is None:
         return None
@@ -466,13 +495,9 @@ def process_directory_files(input_dir, output_dir):
                 attachment_filepaths, attachments_img_dir)
 
             for image in attachment_images:
-
-                image_name = get_image_name(image)
-                sender_name = get_sender_name(sender)
-
-                if not is_duplicate_image(image_name):
+                if not is_duplicate(image, sender):
                     add_image_to_presentation(
-                        image, image_name, sender_name)
+                        image, sender)
 
             return
 
@@ -514,29 +539,28 @@ def process_single_eml_file(filename, output_dir):
     all_images = text_images + attachment_images
 
     for image in all_images:
-
-        image_name = get_image_name(image)
-        sender_name = get_sender_name(sender)
-
-        if not is_duplicate_image(image_name):
+        if not is_duplicate(image, sender):
             add_image_to_presentation(
-                image, image_name, sender_name)
-
+                image, sender)
     return
 
 
-def is_duplicate_image(hash_image_name):
-    return any(read_config_from_text_frame(slide, "image_name") == hash_image_name for slide in prs.slides)
+def is_duplicate(image, sender):
+    return any((read_config(slide, "image") == image and read_config(slide, "sender") == sender) for slide in prs.slides)
 
 
-def add_image_to_presentation(image, hashed_image_name, hashed_sender_name):
-    # Check if the sender already exists in the dictionary
-    if hashed_sender_name in slides_dict:
-        # Add the image to the sender's list
-        slides_dict[hashed_sender_name].append(image)
+def add_image_to_presentation(image, sender):
+    slide_id = get_slide_id(image, sender)
+    if slide_id not in get_processed_slides():
+        if sender in slides_dict:
+            # Add the image to the sender's list
+            slides_dict[sender].append(image)
+        else:
+            # If the sender does not exist, create a new list for them
+            slides_dict[sender] = [image]
     else:
-        # If the sender does not exist, create a new list for them
-        slides_dict[hashed_sender_name] = [image]
+        print(f'Slide was removed. Not re-adding. {slide_id}')
+    write_processed_slide(slide_id)
 
 
 def create_presentation_from_dict(prs):
@@ -544,14 +568,13 @@ def create_presentation_from_dict(prs):
     for sender, images in slides_dict.items():
         for image in images:
             i += 1
-            image_name = get_image_name(image)
             # Add a new slide at the end
             # print(f'Adding slide nr. {i} {image} to slide with hashes {hashed_image_name}')
             slide = prs.slides.add_slide(prs.slide_layouts[5])
             write_default_json_config_to_text_frame(slide)
-            write_config_to_text_frame(
-                slide, "image_name", image_name)
-            write_config_to_text_frame(slide, "sender_name", sender)
+            write_config(
+                slide, "image", image)
+            write_config(slide, "sender", sender)
             remove_title_placeholder(slide)
             add_header_left(slide)
             add_image(slide, image)
@@ -566,7 +589,7 @@ def create_presentation_from_dict(prs):
             add_divider_line(slide, prs)
 
 
-def add_headers_and_print_hashes(prs):
+def add_headers(prs):
     page_count = len(prs.slides)
     for i, slide in enumerate(prs.slides):
         # if right header exists, remove it
@@ -577,13 +600,6 @@ def add_headers_and_print_hashes(prs):
                     slide.shapes._spTree.remove(shape._element)
         add_header_right(slide, i+1, page_count)
     return page_count
-
-    # for i, slide in enumerate(prs.slides):
-    #     # hashed_image_name = read_from_slide_note(slide,"hashed_image_name")
-    #     # hashed_sender_name = read_from_slide_note(slide,"hashed_sender_name")
-    #     hashed_image_name = read_config_from_text_frame(slide, "image_name")
-    #     hashed_sender_name = read_config_from_text_frame(slide, "sender_name")
-    #     print(f'{i+1}: {hashed_image_name} - {hashed_sender_name}')
 
 
 def save_presentation(prs):
@@ -603,9 +619,9 @@ def group_consecutive_numbers(numbers):
 def get_all_senders(prs):
     all_senders = []
     for i, slide in enumerate(prs.slides):
-        hashed_image_name = read_config_from_text_frame(slide, "image_name")
-        hashed_sender_name = read_config_from_text_frame(slide, "sender_name")
-        all_senders.append(hashed_sender_name)
+        # image_name = read_config(slide, "image_name")
+        sender = read_config(slide, "sender")
+        all_senders.append(sender)
     return all_senders
 
 
@@ -630,12 +646,12 @@ if eml_input_dir:
 if scanned_input_dir:
     process_directory_files(scanned_input_dir, output_dir)
 create_presentation_from_dict(prs)
-page_count = add_headers_and_print_hashes(prs)
+page_count = add_headers(prs)
 save_presentation(prs)
 
 # print that new pages start form page
-if page_count > starting_page_count:
-    print(f'New pages start from page: {page_count}')
+if page_count > starting_page_count and starting_page_count > 0:
+    print(f'New pages start from page: {starting_page_count + 1}')
 
 
 all_senders = get_all_senders(prs)
