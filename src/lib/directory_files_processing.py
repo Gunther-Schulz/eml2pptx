@@ -7,14 +7,15 @@ from lib.presentation import add_image_to_presentation, is_duplicate
 
 
 config = load_config()
-scanned_input_dir = config['scanned_input_dir']
+pdf_input_dir = config['pdf_input_dir']
 output_dir = config['output_dir']
 
 
 def process_directory_files():
-    if scanned_input_dir:
+
+    if os.path.isdir(pdf_input_dir):
         # Iterate over all subdirectories of input_dir
-        for root, dirs, files in os.walk(scanned_input_dir):
+        for root, dirs, files in os.walk(pdf_input_dir):
             for dir in dirs:
                 dir_path = os.path.join(root, dir)
 
@@ -47,5 +48,5 @@ def process_directory_files():
 
             return
     else:
-        print('No scanned_input_dir configured in config.yaml')
-        exit()
+        print(
+            f'Skipping processing of .pdf files. {pdf_input_dir} is not a directory')

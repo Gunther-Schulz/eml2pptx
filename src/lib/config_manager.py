@@ -17,7 +17,7 @@ def load_config():
             f.write('pdf_blacklist:\n')
             f.write('  - ".*DUMMY.*"\n')
             f.write('eml_input_dir: eml\n')
-            f.write('scanned_input_dir: scanned\n')
+            f.write('pdf_input_dir: pdf\n')
             f.write('output_dir: extracted\n')
             f.write('page_string: "Seite %d von %d"\n')
             # f.write('font_path: "/Library/Fonts/Arial.ttf"\n')
@@ -51,6 +51,20 @@ def image_basename(image):
 if not os.path.exists(processed_slides_file) or not os.path.exists(presentation_filename):
     with open(processed_slides_file, 'w') as f:
         json.dump({'processed_slides': []}, f)
+
+
+def get_processed_slides_from_json_file():
+    with open(processed_slides_file) as f:
+        data = json.load(f)
+        return data['processed_slides']
+
+
+def write_processed_slide_to_json_file(slide_id):
+    with open(processed_slides_file, 'r+') as f:
+        data = json.load(f)
+        data['processed_slides'].append(slide_id)
+        f.seek(0)
+        json.dump(data, f)
 
 
 def create_directories(output_dir, sender):
@@ -94,20 +108,6 @@ def is_in_blacklist(filename):
             print(f'Found blacklisted file: {filename}')
             return True
     return False
-
-
-def get_processed_slides_from_json_file():
-    with open(processed_slides_file) as f:
-        data = json.load(f)
-        return data['processed_slides']
-
-
-def write_processed_slide_to_json_file(slide_id):
-    with open(processed_slides_file, 'r+') as f:
-        data = json.load(f)
-        data['processed_slides'].append(slide_id)
-        f.seek(0)
-        json.dump(data, f)
 
 
 def get_slide_id(image, sender):

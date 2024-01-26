@@ -18,14 +18,14 @@ text_content_types = ['text/plain', 'text/html']
 
 
 def process_eml_files():
-    if eml_input_dir:
+    if os.path.isdir(eml_input_dir):
         for filename in os.listdir(eml_input_dir):
             if filename.endswith('.eml'):
                 process_single_eml_file(filename, output_dir)
         return
     else:
-        print('No eml_input_dir configured in config.yaml')
-        exit()
+        print(
+            f'Skipping processing of .eml files. {eml_input_dir} is not a directory')
 
 
 def process_single_eml_file(filename, output_dir):

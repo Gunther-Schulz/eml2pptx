@@ -9,7 +9,6 @@ from lib.presentation import add_headers, create_presentation_from_dict, save_pr
 
 starting_page_count = 0
 
-
 process_eml_files()
 process_directory_files()
 prs = create_presentation_from_dict()
