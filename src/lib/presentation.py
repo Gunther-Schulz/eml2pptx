@@ -18,8 +18,9 @@ default_comment = config['default_comment']
 page_string = config['page_string']
 
 slides_dict = {}
-regex_right_header = re.compile(r"Seite \d+/\d+")
-regex_left_header = r"Abwägungsvorschlag Träger öffentlicher Belange.*"
+regex_right_header = re.compile(r"$Seite \d+/\d+")
+regex_left_header = re.compile(
+    r"$Abwägungsvorschlag Träger öffentlicher Belange.*")
 
 
 # Check if the PowerPoint file already exists
