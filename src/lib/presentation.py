@@ -35,7 +35,9 @@ prs.slide_height = Mm(210)
 
 
 def is_duplicate(image, sender):
-    return any((read_config_from_text_box(slide, "image") == image and read_config_from_text_box(slide, "sender") == sender) for slide in prs.slides)
+    # Check if the image is already in the presentation file or in the slides_dict. slides_dict is used to keep track of images that are not in the presentation file yet.
+    return any((read_config_from_text_box(slide, "image") == image
+                and read_config_from_text_box(slide, "sender") == sender) for slide in prs.slides) or any(image in images for images in slides_dict.values())
 
 
 def add_header_left(slide):
@@ -159,9 +161,9 @@ def add_image_to_presentation(image, sender):
         else:
             # If the sender does not exist, create a new list for them
             slides_dict[sender] = [image]
+        write_processed_slide_to_json_file(slide_id)
     else:
         print(f'Slide was removed manually. Not re-adding. {slide_id}')
-    write_processed_slide_to_json_file(slide_id)
 
 
 def create_presentation_from_dict():
@@ -170,7 +172,6 @@ def create_presentation_from_dict():
         for image in images:
             i += 1
             # Add a new slide at the end
-            # print(f'Adding slide nr. {i} {image} to slide with hashes {hashed_image_name}')
             slide = prs.slides.add_slide(prs.slide_layouts[5])
             write_default_json_config_to_text_frame(slide)
             write_config_to_text_box(
@@ -184,7 +185,6 @@ def create_presentation_from_dict():
                 space_index = text.rfind(' ', 0, 120)
                 if space_index != -1:
                     text = text[:space_index] + "\n" + text[space_index+1:]
-
             add_source_text(slide, text)
             add_text_box(slide)
             add_divider_line(slide, prs)
