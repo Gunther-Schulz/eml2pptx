@@ -30,14 +30,7 @@ Put .eml files in the directory specified in the configuration.
 
 ### Scanned documents as PDF
 
-Place the scanned PDF documents in a subdirectory within the directory specified for scanned documents in the configuration. Group these documents by the submitter. The subdirectory's name is flexible and serves only for grouping purposes. In this subdirectory, create an info.json file with the appropriate content.
-
-```json
-{
-  "From": "Name of the sender",
-  "Date": "2000-01-01"
-}
-```
+Place the scanned PDF documents in a subdirectory within the directory specified for scanned documents in the configuration. Group these documents by the submitter. The subdirectory's name is used as the submitter's name.
 
 This is used to add the document source information to the .pptx file.
 
@@ -56,3 +49,5 @@ The output .pptx files are placed in the directory specified in the configuratio
 ### Adding/removing input files (.eml and .pdf)
 
 The script will only process files that have not been processed before. To process more files, simply add them to the input directories and rerun the script. New slides will be added to the existing .pptx file. Unfortunately, there is no way to insert a new slide at an arbitrary position in a .pptx file, so the slides will be appended to the end of the file. Also, the underlying python-pptx library handling the .pptx files does not support deleting slides, so if you want to remove slides, you will have to do so manually.
+
+Additionally, if .eml files are removed, this will not be reflected in the presentation. Slides are never removed (not supported by python-pptx). If an .eml file is removed, it also needs to be removed from the .pptx file manually.

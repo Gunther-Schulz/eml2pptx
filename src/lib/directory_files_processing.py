@@ -19,19 +19,14 @@ def process_directory_files():
             for dir in dirs:
                 dir_path = os.path.join(root, dir)
 
-                # Read the JSON file
-                with open(os.path.join(dir_path, "info.json"), 'r') as f:
-                    info = json.load(f)
+                # Get the sender name from the directory name
+                sender = dir
 
-                sender = info['From']
                 sender_dir, attachments_dir, text_dir, attachments_img_dir, text_img_dir = create_directories(
                     output_dir, sender)
 
-            # copy the json file to the sender directory
-            shutil.copy(os.path.join(dir_path, "info.json"), sender_dir)
-
             attachment_filepaths = []
-
+            print(sender, sender_dir)
             # Iterate over all PDF files in the directory
             for file in os.listdir(dir_path):
                 if file.endswith(".pdf"):
