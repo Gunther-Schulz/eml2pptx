@@ -26,7 +26,7 @@ def process_directory_files():
                     output_dir, sender)
 
             attachment_filepaths = []
-            print(sender, sender_dir)
+
             # Iterate over all PDF files in the directory
             for file in os.listdir(dir_path):
                 if file.endswith(".pdf"):

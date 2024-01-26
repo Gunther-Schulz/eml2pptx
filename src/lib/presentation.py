@@ -15,12 +15,14 @@ config = load_config()
 presentation_filename = config['presentation_filename']
 header_title = config['header_title']
 default_comment = config['default_comment']
-page_string = config['page_string']
+# page_string = config['page_string']
+page_string = "Seite %d von %d"
+# page_string = "Seite %d/%d"
 
 slides_dict = {}
-regex_right_header = re.compile(r"$Seite \d+/\d+")
+regex_right_header = re.compile(r"^Seite \d+ von \d+")  # r"Seite \d+/\d+"
 regex_left_header = re.compile(
-    r"$Abwägungsvorschlag Träger öffentlicher Belange.*")
+    r"^Abwägungsvorschlag Träger öffentlicher Belange")
 
 
 # Check if the PowerPoint file already exists
@@ -180,7 +182,6 @@ def create_presentation_from_dict():
                 slide, "image", image)
             write_config_to_text_box(slide, "sender", sender)
             remove_title_placeholder(slide)
-            add_header_left(slide)
             add_image(slide, image)
             text = f'Quelle: {sender} - {image_basename(image)}'
             if len(text) > 120:
@@ -200,11 +201,15 @@ def add_headers(prs):
         for shape in slide.shapes:
             if shape.has_text_frame:
                 text_frame = shape.text_frame
+                print(text_frame.text)
                 if regex_right_header.match(text_frame.text):
+                    print("Removing right header")
                     slide.shapes._spTree.remove(shape._element)
                 if regex_left_header.match(text_frame.text):
+                    print("Removing left header")
                     slide.shapes._spTree.remove(shape._element)
         add_header_right(slide, i+1, page_count)
+        add_header_left(slide)
     return page_count
 
 
