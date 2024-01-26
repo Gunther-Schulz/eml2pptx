@@ -19,6 +19,7 @@ page_string = config['page_string']
 
 slides_dict = {}
 regex_right_header = re.compile(r"Seite \d+/\d+")
+regex_left_header = r"Abwägungsvorschlag Träger öffentlicher Belange.*"
 
 
 # Check if the PowerPoint file already exists
@@ -199,6 +200,8 @@ def add_headers(prs):
             if shape.has_text_frame:
                 text_frame = shape.text_frame
                 if regex_right_header.match(text_frame.text):
+                    slide.shapes._spTree.remove(shape._element)
+                if regex_left_header.match(text_frame.text):
                     slide.shapes._spTree.remove(shape._element)
         add_header_right(slide, i+1, page_count)
     return page_count
