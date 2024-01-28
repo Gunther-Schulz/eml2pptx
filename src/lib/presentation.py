@@ -249,11 +249,22 @@ def remove_left_border(slide):
                 slide.shapes._spTree.remove(shape._element)
 
 
+def get_all_senders(prs):
+    all_senders = []
+    for i, slide in enumerate(prs.slides):
+        # image_name = read_config(slide, "image_name")
+        sender = read_config_from_text_box(slide, "sender")
+        all_senders.append(sender)
+    # reduce to unique values
+    all_senders = list(dict.fromkeys(all_senders))
+    return all_senders
+
+
 def add_headers(prs):
     page_count = len(prs.slides)
-    sender_count = 0
     color_switch = True  # Variable to switch colors
     current_sender = None  # Variable to keep track of the current sender
+    all_senders = get_all_senders(prs)
 
     for i, slide in enumerate(prs.slides):
         remove_left_border(slide)
@@ -264,7 +275,6 @@ def add_headers(prs):
         if sender != current_sender:
             color_switch = not color_switch  # Switch color
             current_sender = sender  # Update the current sender
-            sender_count += 1  # Increment the sender count
 
         for shape in slide.shapes:
             if shape.has_text_frame:
@@ -282,8 +292,10 @@ def add_headers(prs):
                 255, 255, 0)  # Blue if color_switch is True, otherwise Yellow
             add_left_border(slide, color)
 
-            add_header_right(slide, i+1, page_count, sender_count)
-            add_header_left(slide)
+        sender_idx = all_senders.index(sender) + 1
+
+        add_header_right(slide, i+1, page_count, sender_idx)
+        add_header_left(slide)
 
 
 def save_presentation(prs):

@@ -39,7 +39,7 @@ def print_duplicate_senders(prs):
     all_senders = get_all_senders(prs)
     sender_positions = get_sender_positions(all_senders)
     if sender_positions:
-        print("The following senders appear in more than one section in the presentation:")
+        print("The following senders appear in more than one section in the presentation. You need to re-arrrange the slides manually to group them together.")
         print("\n".join(sender_positions))
 
 
