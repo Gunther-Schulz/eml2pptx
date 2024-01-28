@@ -43,6 +43,6 @@ def print_duplicate_senders(prs):
         print("\n".join(sender_positions))
 
 
-def print_new_pages_start(page_count, starting_page_count):
+def print_new_pages_start(page_count, starting_page_count=0):
     if page_count > starting_page_count and starting_page_count > 0:
         print(f'New pages start from page: {starting_page_count + 1}')

@@ -63,6 +63,10 @@ prs.slide_width = Mm(297)
 prs.slide_height = Mm(210)
 
 
+def count_slides():
+    return len(prs.slides)
+
+
 def is_duplicate(image, sender):
     # Check if the image is already in the presentation file or in the slides_dict. slides_dict is used to keep track of images that are not in the presentation file yet.
     return any((read_config_from_text_box(slide, "image") == image
@@ -280,7 +284,6 @@ def add_headers(prs):
 
             add_header_right(slide, i+1, page_count, sender_count)
             add_header_left(slide)
-    return page_count
 
 
 def save_presentation(prs):
