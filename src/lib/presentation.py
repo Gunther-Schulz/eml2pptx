@@ -9,6 +9,7 @@ from pptx.enum.shapes import MSO_CONNECTOR, PP_PLACEHOLDER
 from PIL import Image
 
 from lib.config_manager import get_processed_slides_from_json_file, get_slide_id, image_basename, load_config, read_config_from_text_box, write_config_to_text_box, write_default_json_config_to_text_frame, write_processed_slide_to_json_file
+from pptx.enum.shapes import MSO_SHAPE
 
 
 config = load_config()
@@ -18,6 +19,7 @@ default_comment = config['default_comment']
 # page_string = config['page_string']
 page_string = "Seite %d von %d"
 # page_string = "Seite %d/%d"
+color_code_sender = config['color_code_sender']
 
 slides_dict = {}
 regex_right_header = re.compile(r"^Seite \d+ von \d+")  # r"Seite \d+/\d+"
@@ -194,22 +196,62 @@ def create_presentation_from_dict():
     return prs
 
 
+def add_left_border(slide, color=RGBColor(255, 255, 0)):
+    # Create a new shape (line) on the slide
+    slide_height = Mm(210)
+    left_border = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE, 0, 0, Pt(5), slide_height
+    )
+
+    # Set the fill of the shape to yellow
+    fill = left_border.fill
+    fill.solid()
+    fill.fore_color.rgb = color
+
+    # Remove the outline of the shape
+    left_border.line.fill.background()
+
+
+def remove_left_border(slide):
+    for shape in slide.shapes:
+        # Check if the shape is a rectangle
+        if shape.shape_type == MSO_SHAPE.RECTANGLE:
+            # Check if the shape is on the left side of the slide
+            if shape.left == 0:
+                # Remove the shape
+                slide.shapes._spTree.remove(shape._element)
+
+
 def add_headers(prs):
     page_count = len(prs.slides)
+    color_switch = True  # Variable to switch colors
+    current_sender = None  # Variable to keep track of the current sender
+
     for i, slide in enumerate(prs.slides):
+        remove_left_border(slide)
         # if right header exists, remove it
+        sender = read_config_from_text_box(slide, "sender")
+
+        # Check if the sender has changed
+        if sender != current_sender:
+            color_switch = not color_switch  # Switch color
+            current_sender = sender  # Update the current sender
+
         for shape in slide.shapes:
             if shape.has_text_frame:
                 text_frame = shape.text_frame
-                print(text_frame.text)
                 if regex_right_header.match(text_frame.text):
-                    print("Removing right header")
                     slide.shapes._spTree.remove(shape._element)
                 if regex_left_header.match(text_frame.text):
-                    print("Removing left header")
                     slide.shapes._spTree.remove(shape._element)
-        add_header_right(slide, i+1, page_count)
-        add_header_left(slide)
+        if color_code_sender:
+            # Add header with alternating colors
+            color = RGBColor(0, 0, 255) if color_switch else RGBColor(
+                255, 255, 0)  # Blue if color_switch is True, otherwise Yellow
+            add_left_border(slide, color)
+
+            add_header_right(slide, i+1, page_count)
+            add_header_left(slide)
     return page_count
 
 
