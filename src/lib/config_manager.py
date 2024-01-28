@@ -11,7 +11,7 @@ def load_config():
     if not os.path.exists('config.yaml'):
         print("config.yaml does not exist. Creating it with default values.")
         with open('config.yaml', 'w') as f:
-            f.write('presentation_filename: presentation.pptx\n')
+            f.write('presentation_filename: presentation\n')
             f.write('header_title: "Eingegangene Emails"\n')
             f.write('default_comment: "Wird zur Kenntnis genommen."\n')
             f.write('pdf_blacklist:\n')
@@ -36,6 +36,9 @@ config = load_config()
 pdf_blacklist = config['pdf_blacklist']
 output_dir = config['output_dir']
 presentation_filename = config['presentation_filename']
+# add file extemsion if it is missing
+if not presentation_filename.endswith('.pptx'):
+    presentation_filename += '.pptx'
 
 processed_slides_file = 'processed_slides.json'
 

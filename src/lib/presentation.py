@@ -16,6 +16,8 @@ from datetime import datetime
 
 config = load_config()
 presentation_filename = config['presentation_filename']
+if not presentation_filename.endswith('.pptx'):
+    presentation_filename += '.pptx'
 header_title = config['header_title']
 default_comment = config['default_comment']
 page_string = config['page_string']
