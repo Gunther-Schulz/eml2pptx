@@ -22,6 +22,16 @@ conda activate eml2pptx
 
 The settings for this application are contained in a `config.json` file, which should be located in the same directory as the executable. If this file doesn't exist initially, running the script once will generate a default config.json. You can then modify this file as needed and rerun the script.
 
+### Headers
+
+There are the `header_title` and `page_string` fields, which are used to set the title of the presentation and the page number string. The page number string is used to set the page number in the footer of the presentation. The page number string should contain three `%d` placeholders, which will be replaced with the current sender number, the current page number, and the total number of pages, respectively.
+
+### PDF Blacklist
+
+`pdf_blacklist`
+
+This is an array of regexes that will be used to filter out PDFs that match any of the regexes. This is useful for filtering out PDFs that are not relevant to the presentation, such as if an email was replied to containing the mail and PDF attachments from the previous email.
+
 ## Input
 
 ### Email .eml files

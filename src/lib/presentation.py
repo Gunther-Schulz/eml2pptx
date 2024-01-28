@@ -10,26 +10,47 @@ from PIL import Image
 
 from lib.config_manager import get_processed_slides_from_json_file, get_slide_id, image_basename, load_config, read_config_from_text_box, write_config_to_text_box, write_default_json_config_to_text_frame, write_processed_slide_to_json_file
 from pptx.enum.shapes import MSO_SHAPE
+import shutil
+from datetime import datetime
 
 
 config = load_config()
 presentation_filename = config['presentation_filename']
 header_title = config['header_title']
 default_comment = config['default_comment']
-# page_string = config['page_string']
-page_string = "Seite %d von %d"
-# page_string = "Seite %d/%d"
+page_string = config['page_string']
+header_title = config['header_title']
 color_code_sender = config['color_code_sender']
 
-slides_dict = {}
-regex_right_header = re.compile(r"^Seite \d+ von \d+")  # r"Seite \d+/\d+"
-regex_left_header = re.compile(
-    r"^Abwägungsvorschlag Träger öffentlicher Belange")
+page_string_regex_pattern = page_string.replace("%d", r"\d+")
+page_string_regex_pattern = "^" + page_string_regex_pattern
+regex_right_header = re.compile(page_string_regex_pattern)
 
+header_title_regex_pattern = "^" + header_title
+regex_left_header = re.compile(header_title_regex_pattern)
+
+slides_dict = {}
+# regex_right_header = re.compile(r"^Seite \d+ von \d+")  # r"Seite \d+/\d+"
+# regex_right_header = re.compile(
+#     r"^Stellungnahme Nr. \d+ - Seite \d+ von \d+")  # r"Seite \d+/\d+"
+# regex_left_header = re.compile(
+#     r"^Abwägungsvorschlag Träger öffentlicher Belange")
+
+
+# Create a backup directory if it doesn't exist
+backup_dir = "backup"
+os.makedirs(backup_dir, exist_ok=True)
 
 # Check if the PowerPoint file already exists
 if os.path.exists(presentation_filename):
-    # If it does, open it
+    # If it does, create a backup
+    base_name, ext = os.path.splitext(os.path.basename(presentation_filename))
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Current timestamp
+    backup_filename = os.path.join(
+        backup_dir, f"{base_name}.backup.{timestamp}{ext}")
+    shutil.copy(presentation_filename, backup_filename)
+
+    # Then open the original file
     prs = Presentation(presentation_filename)
     starting_page_count = len(prs.slides)
 
@@ -58,12 +79,12 @@ def add_header_left(slide):
     tf.paragraphs[0].alignment = PP_ALIGN.LEFT
 
 
-def add_header_right(slide, page_number, total_pages):
+def add_header_right(slide, page_number, total_pages, sender_nr=0):
     bold = False
     size = 10
     header = slide.shapes.add_textbox(Cm(1), 0, prs.slide_width - Cm(2), Cm(1))
     tf = header.text_frame
-    tf.text = page_string % (page_number, total_pages)
+    tf.text = page_string % (sender_nr, page_number, total_pages)
     tf.paragraphs[0].font.size = Pt(size)
     tf.paragraphs[0].font.bold = bold
     tf.paragraphs[0].alignment = PP_ALIGN.RIGHT
@@ -224,6 +245,7 @@ def remove_left_border(slide):
 
 def add_headers(prs):
     page_count = len(prs.slides)
+    sender_count = 0
     color_switch = True  # Variable to switch colors
     current_sender = None  # Variable to keep track of the current sender
 
@@ -236,21 +258,25 @@ def add_headers(prs):
         if sender != current_sender:
             color_switch = not color_switch  # Switch color
             current_sender = sender  # Update the current sender
+            sender_count += 1  # Increment the sender count
 
         for shape in slide.shapes:
             if shape.has_text_frame:
                 text_frame = shape.text_frame
                 if regex_right_header.match(text_frame.text):
+                    # print("removing right header")
                     slide.shapes._spTree.remove(shape._element)
                 if regex_left_header.match(text_frame.text):
+                    # print("removing left header")
                     slide.shapes._spTree.remove(shape._element)
+
         if color_code_sender:
             # Add header with alternating colors
             color = RGBColor(0, 0, 255) if color_switch else RGBColor(
                 255, 255, 0)  # Blue if color_switch is True, otherwise Yellow
             add_left_border(slide, color)
 
-            add_header_right(slide, i+1, page_count)
+            add_header_right(slide, i+1, page_count, sender_count)
             add_header_left(slide)
     return page_count
 

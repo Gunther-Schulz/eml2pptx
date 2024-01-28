@@ -20,7 +20,7 @@ def load_config():
             f.write('pdf_input_dir: pdf\n')
             f.write('output_dir: extracted\n')
             f.write('page_string: "Seite %d von %d"\n')
-            # f.write('font_path: "/Library/Fonts/Arial.ttf"\n')
+            f.write('color_code_sender: True\n')
         print("Please configure config.yaml and run the script again.")
         exit()
 
