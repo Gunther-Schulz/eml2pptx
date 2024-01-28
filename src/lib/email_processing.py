@@ -29,7 +29,7 @@ def process_eml_files():
 
 
 def process_single_eml_file(filename, output_dir):
-    with open(f'./eml/{filename}', 'rb') as f:
+    with open(f'{eml_input_dir}/{filename}', 'rb') as f:
         msg = BytesParser(policy=policy.default).parse(f)
 
     sender = parseaddr(msg['From'])[1]
@@ -37,7 +37,7 @@ def process_single_eml_file(filename, output_dir):
         output_dir, sender)
 
     # copy the eml file to the sender directory
-    shutil.copy(f'./eml/{filename}', sender_dir)
+    shutil.copy(f'{eml_input_dir}/{filename}', sender_dir)
 
     message_content = get_html_content(msg)
 

@@ -1,8 +1,11 @@
 
 .DS_Store
 eml/
+Email/
 extracted/
 scanned/
+Scanned/
+Dokumente/
 config.yaml
 
 
@@ -15,3 +18,5 @@ processed_slides.json
 __pycache__/
 
 backup/
+
+Email/
