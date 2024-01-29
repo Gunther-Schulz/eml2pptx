@@ -227,7 +227,7 @@ def add_left_border(slide, color=RGBColor(255, 255, 0)):
     # Create a new shape (line) on the slide
     slide_height = Mm(210)
     left_border = slide.shapes.add_shape(
-        MSO_SHAPE.RECTANGLE, 0, 0, Pt(5), slide_height
+        MSO_SHAPE.RECTANGLE, 0, 0, Pt(10), slide_height
     )
 
     # Set the fill of the shape to yellow
@@ -249,26 +249,27 @@ def remove_left_border(slide):
                 slide.shapes._spTree.remove(shape._element)
 
 
-def get_all_senders(prs):
-    all_senders = []
-    for i, slide in enumerate(prs.slides):
-        # image_name = read_config(slide, "image_name")
-        sender = read_config_from_text_box(slide, "sender")
-        all_senders.append(sender)
-    # reduce to unique values
-    all_senders = list(dict.fromkeys(all_senders))
-    return all_senders
+def slide_is_hidden(slide):
+
+    slide_element = slide._element
+    if 'show' in slide_element.attrib:
+        if slide_element.get('show') == '0':
+            return True
+        else:
+            return False
+    else:
+        return False
 
 
 def add_headers(prs):
-    page_count = len(prs.slides)
     color_switch = True  # Variable to switch colors
     current_sender = None  # Variable to keep track of the current sender
-    all_senders = get_all_senders(prs)
+    colors = [RGBColor(0, 0, 255), RGBColor(255, 255, 0)]
 
     for i, slide in enumerate(prs.slides):
+        slide_is_hidden(slide)
+
         remove_left_border(slide)
-        # if right header exists, remove it
         sender = read_config_from_text_box(slide, "sender")
 
         # Check if the sender has changed
@@ -280,22 +281,33 @@ def add_headers(prs):
             if shape.has_text_frame:
                 text_frame = shape.text_frame
                 if regex_right_header.match(text_frame.text):
-                    # print("removing right header")
+
                     slide.shapes._spTree.remove(shape._element)
                 if regex_left_header.match(text_frame.text):
-                    # print("removing left header")
                     slide.shapes._spTree.remove(shape._element)
 
-        if color_code_sender:
+        if color_code_sender and sender:
             # Add header with alternating colors
-            color = RGBColor(0, 0, 255) if color_switch else RGBColor(
-                255, 255, 0)  # Blue if color_switch is True, otherwise Yellow
+            # Blue if color_switch is True, otherwise Yellow
+            color = colors[0] if color_switch else colors[1]
             add_left_border(slide, color)
 
-        sender_idx = all_senders.index(sender) + 1
+    # Only add headers to visible slides
+    visible_slides = [
+        slide for slide in prs.slides if not slide_is_hidden(slide)]
 
-        add_header_right(slide, i+1, page_count, sender_idx)
-        add_header_left(slide)
+    visible_slide_count = len(visible_slides)
+    sender_counter = 0
+    previous_sender = None
+    for i, slide in enumerate(visible_slides):
+        sender = read_config_from_text_box(slide, "sender")
+        # Increase counter every time the sender changes
+        if previous_sender != sender:
+            sender_counter += 1
+            previous_sender = sender
+        if sender:
+            add_header_right(slide, i+1, visible_slide_count, sender_counter)
+            add_header_left(slide)
 
 
 def save_presentation(prs):
