@@ -1,7 +1,6 @@
 import os
 import re
 from pptx import Presentation
-from pptx import Presentation
 from pptx.util import Pt, Mm, Cm
 from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
@@ -13,7 +12,6 @@ from pptx.enum.shapes import MSO_SHAPE
 import shutil
 from datetime import datetime
 
-
 config = load_config()
 presentation_filename = config['presentation_filename']
 if not presentation_filename.endswith('.pptx'):
@@ -23,6 +21,7 @@ default_comment = config['default_comment']
 page_string = config['page_string']
 header_title = config['header_title']
 color_code_sender = config['color_code_sender']
+show_sender = config['show_sender']
 
 page_string_regex_pattern = page_string.replace("%d", r"\d+")
 page_string_regex_pattern = "^" + page_string_regex_pattern
@@ -31,12 +30,15 @@ regex_right_header = re.compile(page_string_regex_pattern)
 header_title_regex_pattern = "^" + header_title
 regex_left_header = re.compile(header_title_regex_pattern)
 
+regex_from_email = re.compile(
+    r"Von: \b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+
 slides_dict = {}
-# regex_right_header = re.compile(r"^Seite \d+ von \d+")  # r"Seite \d+/\d+"
-# regex_right_header = re.compile(
-#     r"^Stellungnahme Nr. \d+ - Seite \d+ von \d+")  # r"Seite \d+/\d+"
-# regex_left_header = re.compile(
-#     r"^Abwägungsvorschlag Träger öffentlicher Belange")
+regex_right_header = re.compile(r"^Seite \d+ von \d+")  # r"Seite \d+/\d+"
+regex_right_header = re.compile(
+    r"^Stellungnahme Nr. \d+ - Seite \d+ von \d+")  # r"Seite \d+/\d+"
+regex_left_header = re.compile(
+    r"^Abwägungsvorschlag Träger öffentlicher Belange")
 
 
 # Create a backup directory if it doesn't exist
@@ -260,6 +262,22 @@ def slide_is_hidden(slide):
     else:
         return False
 
+# add sender name to left side, 2 cm from top
+
+
+def add_sender_name(slide, sender):
+    bold = False
+    size = 10
+    # Add a header to the slide
+    # Parameters are left, top, width, height
+    header = slide.shapes.add_textbox(
+        Cm(1), Cm(0.8), prs.slide_width - Cm(2), Cm(1))
+    tf = header.text_frame
+    tf.text = "Von: " + sender
+    tf.paragraphs[0].font.size = Pt(size)
+    tf.paragraphs[0].font.bold = bold
+    tf.paragraphs[0].alignment = PP_ALIGN.LEFT
+
 
 def add_headers(prs):
     color_switch = True  # Variable to switch colors
@@ -267,30 +285,31 @@ def add_headers(prs):
     colors = [RGBColor(0, 0, 255), RGBColor(255, 255, 0)]
 
     for i, slide in enumerate(prs.slides):
-        slide_is_hidden(slide)
-
-        remove_left_border(slide)
         sender = read_config_from_text_box(slide, "sender")
+        if sender:
+            remove_left_border(slide)
 
-        # Check if the sender has changed
-        if sender != current_sender:
-            color_switch = not color_switch  # Switch color
-            current_sender = sender  # Update the current sender
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    text_frame = shape.text_frame
+                    if regex_right_header.match(text_frame.text):
+                        slide.shapes._spTree.remove(shape._element)
+                    if regex_left_header.match(text_frame.text):
+                        slide.shapes._spTree.remove(shape._element)
+                    if regex_from_email.match(text_frame.text):
+                        slide.shapes._spTree.remove(shape._element)
 
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                text_frame = shape.text_frame
-                if regex_right_header.match(text_frame.text):
-
-                    slide.shapes._spTree.remove(shape._element)
-                if regex_left_header.match(text_frame.text):
-                    slide.shapes._spTree.remove(shape._element)
-
-        if color_code_sender and sender:
-            # Add header with alternating colors
-            # Blue if color_switch is True, otherwise Yellow
-            color = colors[0] if color_switch else colors[1]
-            add_left_border(slide, color)
+            # Check if the sender has changed
+            if sender != current_sender:
+                color_switch = not color_switch  # Switch color
+                current_sender = sender  # Update the current sender
+            if color_code_sender:
+                # Add header with alternating colors
+                # Blue if color_switch is True, otherwise Yellow
+                color = colors[0] if color_switch else colors[1]
+                add_left_border(slide, color)
+            if show_sender:
+                add_sender_name(slide, sender)
 
     # Only add headers to visible slides
     visible_slides = [
