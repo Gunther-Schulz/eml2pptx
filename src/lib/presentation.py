@@ -6,7 +6,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_CONNECTOR, PP_PLACEHOLDER
 from PIL import Image
-
+from lib.xlsx_processing import get_id, set_if_replied
 from lib.config_manager import get_processed_slides_from_json_file, get_slide_id, image_basename, load_config, read_config_from_text_box, write_config_to_text_box, write_default_json_config_to_text_frame, write_processed_slide_to_json_file
 from pptx.enum.shapes import MSO_SHAPE
 import shutil
@@ -30,8 +30,9 @@ regex_right_header = re.compile(page_string_regex_pattern)
 header_title_regex_pattern = "^" + header_title
 regex_left_header = re.compile(header_title_regex_pattern)
 
-regex_from_email = re.compile(
-    r"Von: \b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+# regex_from_email = re.compile(
+#     r"Von: \b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+regex_from_email = re.compile(r"^Von: .+")
 
 slides_dict = {}
 regex_right_header = re.compile(r"^Seite \d+ von \d+")  # r"Seite \d+/\d+"
@@ -73,6 +74,10 @@ def is_duplicate(image, sender):
     # Check if the image is already in the presentation file or in the slides_dict. slides_dict is used to keep track of images that are not in the presentation file yet.
     return any((read_config_from_text_box(slide, "image") == image
                 and read_config_from_text_box(slide, "sender") == sender) for slide in prs.slides) or any(image in images for images in slides_dict.values())
+
+
+def get_all_senders():
+    return [read_config_from_text_box(slide, "sender") for slide in prs.slides]
 
 
 def add_header_left(slide):
@@ -265,7 +270,9 @@ def slide_is_hidden(slide):
 # add sender name to left side, 2 cm from top
 
 
-def add_sender_name(slide, sender):
+def add_sender_name_and_set_replied(slide, sender):
+    xlsx_id = str(get_id(sender))
+    # set_if_replied(sender)
     bold = False
     size = 10
     # Add a header to the slide
@@ -273,7 +280,8 @@ def add_sender_name(slide, sender):
     header = slide.shapes.add_textbox(
         Cm(1), Cm(0.8), prs.slide_width - Cm(2), Cm(1))
     tf = header.text_frame
-    tf.text = "Von: " + sender
+    tf.text = f'Von: {sender} - Id: {xlsx_id}'
+    # tf.text = f'Von: {sender}'
     tf.paragraphs[0].font.size = Pt(size)
     tf.paragraphs[0].font.bold = bold
     tf.paragraphs[0].alignment = PP_ALIGN.LEFT
@@ -309,7 +317,7 @@ def add_headers(prs):
                 color = colors[0] if color_switch else colors[1]
                 add_left_border(slide, color)
             if show_sender:
-                add_sender_name(slide, sender)
+                add_sender_name_and_set_replied(slide, sender)
 
     # Only add headers to visible slides
     visible_slides = [

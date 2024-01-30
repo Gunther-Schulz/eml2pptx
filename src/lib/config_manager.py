@@ -6,10 +6,12 @@ import yaml
 from pptx.util import Pt, Cm
 from pptx.dml.color import RGBColor
 
+config_file = 'config.yaml'
 
-def load_config():
-    if not os.path.exists('config.yaml'):
-        print("config.yaml does not exist. Creating it with default values.")
+
+def load_config(config_file=config_file):
+    if not os.path.exists(config_file):
+        print(f"{config_file} does not exist. Creating it with default values.")
         with open('config.yaml', 'w') as f:
             f.write('presentation_filename: presentation\n')
             f.write('header_title: "Eingegangene Emails"\n')
@@ -24,7 +26,7 @@ def load_config():
         print("Please configure config.yaml and run the script again.")
         exit()
 
-    with open('config.yaml', 'r') as f:
+    with open(config_file, 'r') as f:
         config = yaml.safe_load(f)
 
     config['pdf_blacklist'] = [re.compile(
