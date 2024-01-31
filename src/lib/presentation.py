@@ -6,7 +6,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_CONNECTOR, PP_PLACEHOLDER
 from PIL import Image
-from lib.xlsx_processing import get_id, set_if_replied
+from lib.xlsx_processing import get_id
 from lib.config_manager import get_processed_slides_from_json_file, get_slide_id, image_basename, load_config, read_config_from_text_box, write_config_to_text_box, write_default_json_config_to_text_frame, write_processed_slide_to_json_file
 from pptx.enum.shapes import MSO_SHAPE
 import shutil
@@ -33,14 +33,17 @@ regex_left_header = re.compile(header_title_regex_pattern)
 # regex_from_email = re.compile(
 #     r"Von: \b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 regex_from_email = re.compile(r"^Von: .+")
+regex_email_date = re.compile(r"^Eingang: .+")
 
-slides_dict = {}
+
 regex_right_header = re.compile(r"^Seite \d+ von \d+")  # r"Seite \d+/\d+"
 regex_right_header = re.compile(
     r"^Stellungnahme Nr. \d+ - Seite \d+ von \d+")  # r"Seite \d+/\d+"
 regex_left_header = re.compile(
     r"^Abwägungsvorschlag Träger öffentlicher Belange")
 
+slides_dict = {}
+slides_dict_email_dates = {}
 
 # Create a backup directory if it doesn't exist
 backup_dir = "backup"
@@ -146,6 +149,20 @@ def add_source_text(slide, text):
         paragraph.font.size = Pt(6)
 
 
+def add_date(slide, email_date):
+    # Function that adds the email date below the source text
+    left = Cm(1.6)
+    top = Cm(19.75)
+    width = Cm(13.5)
+    height = Cm(1)
+    txBox = slide.shapes.add_textbox(left, top, width, height)
+    tf = txBox.text_frame
+    # remove everything after "_" form the date string
+    tf.text = "Eingang: " + email_date.split("_")[0]
+    for paragraph in tf.paragraphs:
+        paragraph.font.size = Pt(6)
+
+
 def add_divider_line(slide, prs):
     left = prs.slide_width // 2
     top = Cm(0.7)
@@ -192,13 +209,15 @@ def remove_title_placeholder(slide):
                 sp.getparent().remove(sp)
 
 
-def add_image_to_presentation(image, sender):
+def add_image_to_presentation(image, sender, email_date):
     slide_id = get_slide_id(image, sender)
     if slide_id not in get_processed_slides_from_json_file():
         if sender in slides_dict:
+            slides_dict_email_dates[sender].append(email_date)
             # Add the image to the sender's list
             slides_dict[sender].append(image)
         else:
+            slides_dict_email_dates[sender] = [email_date]
             # If the sender does not exist, create a new list for them
             slides_dict[sender] = [image]
         write_processed_slide_to_json_file(slide_id)
@@ -207,10 +226,8 @@ def add_image_to_presentation(image, sender):
 
 
 def create_presentation_from_dict():
-    i = 0
     for sender, images in slides_dict.items():
-        for image in images:
-            i += 1
+        for i, image in enumerate(images):
             # Add a new slide at the end
             slide = prs.slides.add_slide(prs.slide_layouts[5])
             write_default_json_config_to_text_frame(slide)
@@ -225,6 +242,8 @@ def create_presentation_from_dict():
                 if space_index != -1:
                     text = text[:space_index] + "\n" + text[space_index+1:]
             add_source_text(slide, text)
+            email_date = slides_dict_email_dates[sender][i]
+            add_date(slide, email_date)
             add_text_box(slide)
             add_divider_line(slide, prs)
     return prs

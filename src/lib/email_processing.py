@@ -59,8 +59,9 @@ def process_single_eml_file(filename, output_dir):
 
     for image in all_images:
         if not is_duplicate(image, sender):
+            email_date = get_email_date(msg)
             add_image_to_presentation(
-                image, sender)
+                image, sender, email_date)
     return
 
 

@@ -39,7 +39,7 @@ def process_directory_files():
             for image in attachment_images:
                 if not is_duplicate(image, sender):
                     add_image_to_presentation(
-                        image, sender)
+                        image, sender, "Per Post")
 
             return
     else:
