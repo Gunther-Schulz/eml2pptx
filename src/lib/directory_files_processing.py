@@ -15,7 +15,7 @@ def process_directory_files():
 
     if os.path.isdir(pdf_input_dir):
         # Iterate over all subdirectories of input_dir
-        for root, dirs, files in os.walk(pdf_input_dir):
+        for root, dirs, _ in os.walk(pdf_input_dir):
             for dir in dirs:
                 dir_path = os.path.join(root, dir)
 
@@ -25,23 +25,24 @@ def process_directory_files():
                 sender_dir, attachments_dir, text_dir, attachments_img_dir, text_img_dir = create_directories(
                     output_dir, sender)
 
-            attachment_filepaths = []
+                attachment_filepaths = []
 
-            # Iterate over all PDF files in the directory
-            for file in os.listdir(dir_path):
-                if file.endswith(".pdf"):
-                    # Save the filepath
-                    attachment_filepaths.append(os.path.join(dir_path, file))
+                # Iterate over all PDF files in the directory
+                for file in os.listdir(dir_path):
+                    if file.endswith(".pdf"):
+                        # Save the filepath
+                        attachment_filepaths.append(
+                            os.path.join(dir_path, file))
 
-            attachment_images = convert_pdfs_to_images(
-                attachment_filepaths, attachments_img_dir)
+                attachment_images = convert_pdfs_to_images(
+                    attachment_filepaths, attachments_img_dir)
 
-            for image in attachment_images:
-                if not is_duplicate(image, sender):
-                    add_image_to_presentation(
-                        image, sender, "Per Post")
+                for image in attachment_images:
+                    if not is_duplicate(image, sender):
+                        add_image_to_presentation(
+                            image, sender, "Per Post")
 
-            return
+            # return
     else:
         print(
             f'Skipping processing of .pdf files. {pdf_input_dir} is not a directory')
