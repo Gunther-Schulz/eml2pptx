@@ -80,7 +80,6 @@ def set_if_replied(email):
         replied_cell = sheet.cell(
             row=email_cell.row, column=replied_column_index)
         replied_cell.value = True
-        save_xlsx_file()
         return True
     else:
         return False
@@ -102,3 +101,7 @@ def update_excel_file(emails):
         set_if_replied(email)
         # if not set_if_replied(email):
         #     print(f'Warning: email {email} not found in xlsx file')
+
+    # close workbook
+    save_xlsx_file()
+    wb.close()
