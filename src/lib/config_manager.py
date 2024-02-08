@@ -42,6 +42,7 @@ presentation_filename = config['presentation_filename']
 if not presentation_filename.endswith('.pptx'):
     presentation_filename += '.pptx'
 
+# This files is used for storing the slide ids of the processed slides. We need to track it because we don't want to re-add the same slide to the presentation if it was removed manually.
 processed_slides_file = 'processed_slides.json'
 
 # Create output directory if it doesn't exist

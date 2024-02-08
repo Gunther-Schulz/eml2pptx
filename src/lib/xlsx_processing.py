@@ -91,10 +91,11 @@ def update_excel_file(emails):
     # check that the excel file not not currently opened in the windows programm Excel. check by testing for the existence of the file starting with a tilde
     filename = os.path.basename(xlsx_filepath)
     directory = os.path.dirname(xlsx_filepath)
+    lockfile = os.path.join(directory, f'~${filename}')
 
-    if os.path.exists(os.path.join(directory, f'~${filename}')):
+    if os.path.exists(lockfile):
         print(
-            f'Error: Updating the Excel file failed. Excel file {xlsx_filepath} is currently open in Excel. Please close the file and try again.')
+            f'Error: Updating the Excel file failed. Lock file {lockfile} exists. Please close the Excel file and try again.')
         return
 
     for email in emails:
